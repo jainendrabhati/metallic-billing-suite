@@ -1,37 +1,67 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Users, CreditCard, TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { customerAPI, billAPI, transactionAPI, expenseAPI } from "@/services/api";
+import { format } from "date-fns";
 
 const Dashboard = () => {
+  // Fetch data
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: customerAPI.getAll,
+  });
+
+  const { data: bills = [] } = useQuery({
+    queryKey: ['bills'],
+    queryFn: billAPI.getAll,
+  });
+
+  const { data: transactions = [] } = useQuery({
+    queryKey: ['transactions'],
+    queryFn: () => transactionAPI.getAll(),
+  });
+
+  const { data: expenses = [] } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: expenseAPI.getAll,
+  });
+
+  // Calculate statistics
+  const totalRevenue = bills.reduce((sum, bill) => sum + bill.total_amount, 0);
+  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const growthPercentage = bills.length > 0 ? ((bills.length / Math.max(bills.length - 10, 1)) * 100) - 100 : 0;
+
   const stats = [
     {
       title: "Total Bills",
-      value: "1,234",
-      change: "+12%",
+      value: bills.length.toString(),
+      change: `+${bills.length > 10 ? Math.round((bills.length / (bills.length - 10)) * 100 - 100) : 0}%`,
       icon: FileText,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
     },
     {
       title: "Customers",
-      value: "856",
-      change: "+8%",
+      value: customers.length.toString(),
+      change: `+${customers.length > 5 ? Math.round((customers.length / (customers.length - 5)) * 100 - 100) : 0}%`,
       icon: Users,
       color: "text-green-600",
       bgColor: "bg-green-100",
     },
     {
       title: "Revenue",
-      value: "₹2,45,678",
+      value: `₹${totalRevenue.toLocaleString()}`,
       change: "+15%",
       icon: CreditCard,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
     {
-      title: "Growth",
-      value: "23.5%",
-      change: "+5%",
+      title: "Net Profit",
+      value: `₹${netProfit.toLocaleString()}`,
+      change: `${netProfit >= 0 ? '+' : ''}${Math.round(growthPercentage)}%`,
       icon: TrendingUp,
       color: "text-orange-600",
       bgColor: "bg-orange-100",
@@ -75,18 +105,23 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+              {bills.slice(0, 4).map((bill) => (
+                <div key={bill.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                   <div>
-                    <div className="font-medium">Bill #{1000 + item}</div>
-                    <div className="text-sm text-gray-500">Customer {item}</div>
+                    <div className="font-medium">Bill #{bill.id}</div>
+                    <div className="text-sm text-gray-500">{bill.customer_name}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-medium">₹{(Math.random() * 10000).toFixed(0)}</div>
-                    <div className="text-sm text-gray-500">Today</div>
+                    <div className="font-medium">₹{bill.total_amount.toFixed(2)}</div>
+                    <div className="text-sm text-gray-500">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
                   </div>
                 </div>
               ))}
+              {bills.length === 0 && (
+                <div className="text-center text-gray-500 py-4">
+                  No bills created yet
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
