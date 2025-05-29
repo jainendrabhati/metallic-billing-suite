@@ -1,4 +1,3 @@
-
 const API_BASE_URL = 'http://localhost:5000/api';
 
 export interface Customer {
@@ -55,6 +54,31 @@ export interface Expense {
   category: string;
   status: 'paid' | 'pending';
   date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Employee {
+  id: number;
+  name: string;
+  position: string;
+  monthly_salary: number;
+  present_days: number;
+  total_days: number;
+  calculated_salary: number;
+  paid_amount: number;
+  remaining_amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeePayment {
+  id: number;
+  employee_id: number;
+  employee_name?: string;
+  amount: number;
+  payment_date: string;
+  description: string;
   created_at: string;
   updated_at: string;
 }
@@ -195,6 +219,59 @@ export const settingsAPI = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings),
+    });
+    return response.json();
+  },
+};
+
+// Employee API
+export const employeeAPI = {
+  getAll: async (): Promise<Employee[]> => {
+    const response = await fetch(`${API_BASE_URL}/employees`);
+    return response.json();
+  },
+  
+  create: async (employee: Omit<Employee, 'id' | 'calculated_salary' | 'remaining_amount' | 'created_at' | 'updated_at'>): Promise<Employee> => {
+    const response = await fetch(`${API_BASE_URL}/employees`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(employee),
+    });
+    return response.json();
+  },
+  
+  update: async (id: number, employee: Partial<Employee>): Promise<Employee> => {
+    const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(employee),
+    });
+    return response.json();
+  },
+  
+  getById: async (id: number): Promise<Employee> => {
+    const response = await fetch(`${API_BASE_URL}/employees/${id}`);
+    return response.json();
+  },
+};
+
+// Employee Payment API
+export const employeePaymentAPI = {
+  getAll: async (): Promise<EmployeePayment[]> => {
+    const response = await fetch(`${API_BASE_URL}/employee-payments`);
+    return response.json();
+  },
+  
+  getByEmployeeId: async (employeeId: number): Promise<EmployeePayment[]> => {
+    const response = await fetch(`${API_BASE_URL}/employee-payments/employee/${employeeId}`);
+    return response.json();
+  },
+  
+  create: async (payment: Omit<EmployeePayment, 'id' | 'employee_name' | 'created_at' | 'updated_at'>): Promise<EmployeePayment> => {
+    const response = await fetch(`${API_BASE_URL}/employee-payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payment),
     });
     return response.json();
   },
