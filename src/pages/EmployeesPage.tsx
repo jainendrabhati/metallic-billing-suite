@@ -3,43 +3,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Users, Plus, DollarSign, Calendar, TrendingUp } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { employeeAPI, employeePaymentAPI, Employee, EmployeePayment } from "@/services/api";
-import { Plus, UserPlus, CalendarIcon, FileText, Wallet } from "lucide-react";
-import StockManagement from "@/components/StockManagement";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { employeeAPI, employeePaymentAPI } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const EmployeesPage = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [employeeName, setEmployeeName] = useState("");
-  const [employeePosition, setEmployeePosition] = useState("");
+  const [name, setName] = useState("");
+  const [position, setPosition] = useState("");
   const [monthlySalary, setMonthlySalary] = useState("");
   const [presentDays, setPresentDays] = useState("");
   const [totalDays, setTotalDays] = useState("");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
   const [paymentDescription, setPaymentDescription] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
-  const { data: employees = [], isLoading } = useQuery({
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
     queryFn: employeeAPI.getAll,
   });
 
   const { data: employeePayments = [] } = useQuery({
-    queryKey: ['employeePayments', selectedEmployeeId],
-    queryFn: () => selectedEmployeeId ? employeePaymentAPI.getByEmployeeId(selectedEmployeeId) : [],
-    enabled: !!selectedEmployeeId,
+    queryKey: ['employeePayments', selectedEmployee?.id],
+    queryFn: () => employeePaymentAPI.getByEmployeeId(selectedEmployee?.id),
+    enabled: !!selectedEmployee,
   });
 
   const createEmployeeMutation = useMutation({
@@ -48,14 +44,32 @@ const EmployeesPage = () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast({
         title: "Success",
-        description: "Employee created successfully!",
+        description: "Employee added successfully!",
       });
       resetForm();
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create employee. Please try again.",
+        description: "Failed to add employee. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: (data: { id: number; employee: Partial<any> }) => employeeAPI.update(data.id, data.employee),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast({
+        title: "Success",
+        description: "Employee updated successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update employee. Please try again.",
         variant: "destructive",
       });
     },
@@ -64,26 +78,36 @@ const EmployeesPage = () => {
   const createEmployeePaymentMutation = useMutation({
     mutationFn: employeePaymentAPI.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employeePayments', selectedEmployeeId] });
+      queryClient.invalidateQueries({ queryKey: ['employeePayments', selectedEmployee?.id] });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast({
         title: "Success",
-        description: "Payment recorded successfully!",
+        description: "Payment added successfully!",
       });
-      resetPaymentForm();
+      setPaymentAmount("");
+      setPaymentDescription("");
+      setShowPaymentDialog(false);
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: "Failed to record payment. Please try again.",
+        description: "Failed to add payment. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const handleCreateEmployee = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setName("");
+    setPosition("");
+    setMonthlySalary("");
+    setPresentDays("");
+    setTotalDays("");
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!employeeName || !employeePosition || !monthlySalary || !presentDays || !totalDays) {
+    if (!name || !position || !monthlySalary || !presentDays || !totalDays) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -93,300 +117,222 @@ const EmployeesPage = () => {
     }
 
     createEmployeeMutation.mutate({
-      name: employeeName,
-      position: employeePosition,
+      name,
+      position,
       monthly_salary: parseFloat(monthlySalary),
       present_days: parseInt(presentDays),
       total_days: parseInt(totalDays),
+      paid_amount: 0, // Initialize with 0
     });
   };
 
-  const handleCreatePayment = async (e: React.FormEvent) => {
+  const handlePayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentAmount || !paymentDate || !selectedEmployeeId) {
+    if (!paymentAmount) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields.",
+        description: "Please enter a valid amount.",
         variant: "destructive",
       });
       return;
     }
 
     createEmployeePaymentMutation.mutate({
-      employee_id: selectedEmployeeId,
+      employee_id: selectedEmployee.id,
       amount: parseFloat(paymentAmount),
-      payment_date: format(paymentDate, "yyyy-MM-dd"),
+      payment_date: format(new Date(), 'yyyy-MM-dd'),
       description: paymentDescription,
+    });
+
+    updateEmployeeMutation.mutate({
+      id: selectedEmployee.id,
+      employee: {
+        paid_amount: selectedEmployee.paid_amount + parseFloat(paymentAmount),
+      },
     });
   };
 
-  const resetForm = () => {
-    setIsDialogOpen(false);
-    setEmployeeName("");
-    setEmployeePosition("");
-    setMonthlySalary("");
-    setPresentDays("");
-    setTotalDays("");
-  };
-
-  const resetPaymentForm = () => {
-    setPaymentAmount("");
-    setPaymentDate(new Date());
-    setPaymentDescription("");
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-gray-500">Loading employees...</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 bg-gray-50 min-h-screen p-6">
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-6 border-b bg-gradient-to-r from-purple-600 to-purple-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white">Employee & Stock Management</h1>
-              <p className="text-purple-100 mt-1">Comprehensive employee payroll and inventory management</p>
-            </div>
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
+            <p className="text-gray-600 mt-1">Manage employee details and track payments</p>
           </div>
         </div>
 
-        <div className="p-6">
-          <Tabs defaultValue="employees" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="employees">Employee Management</TabsTrigger>
-              <TabsTrigger value="stock">Stock Management</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="employees" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Employee Management</h2>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold">
-                      <UserPlus className="h-4 w-4" />
-                      Add New Employee
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Create New Employee</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateEmployee} className="space-y-4">
-                      <div>
-                        <Label htmlFor="employeeName">Employee Name</Label>
-                        <Input
-                          id="employeeName"
-                          value={employeeName}
-                          onChange={(e) => setEmployeeName(e.target.value)}
-                          placeholder="Enter employee name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="employeePosition">Position</Label>
-                        <Input
-                          id="employeePosition"
-                          value={employeePosition}
-                          onChange={(e) => setEmployeePosition(e.target.value)}
-                          placeholder="Enter position"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="monthlySalary">Monthly Salary</Label>
-                        <Input
-                          id="monthlySalary"
-                          type="number"
-                          step="0.01"
-                          value={monthlySalary}
-                          onChange={(e) => setMonthlySalary(e.target.value)}
-                          placeholder="Enter monthly salary"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="presentDays">Present Days</Label>
-                          <Input
-                            id="presentDays"
-                            type="number"
-                            value={presentDays}
-                            onChange={(e) => setPresentDays(e.target.value)}
-                            placeholder="Enter present days"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="totalDays">Total Days</Label>
-                          <Input
-                            id="totalDays"
-                            type="number"
-                            value={totalDays}
-                            onChange={(e) => setTotalDays(e.target.value)}
-                            placeholder="Enter total days"
-                          />
-                        </div>
-                      </div>
-                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold">
-                        {createEmployeeMutation.isPending ? "Creating..." : "Create Employee"}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+        <Card className="shadow-lg border-0">
+          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Users className="h-5 w-5" />
+              Add New Employee
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter employee name"
+                    className="border-gray-300 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="position">Position</Label>
+                  <Input
+                    id="position"
+                    type="text"
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                    placeholder="Enter employee position"
+                    className="border-gray-300 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="monthlySalary">Monthly Salary</Label>
+                  <Input
+                    id="monthlySalary"
+                    type="number"
+                    step="0.01"
+                    value={monthlySalary}
+                    onChange={(e) => setMonthlySalary(e.target.value)}
+                    placeholder="Enter monthly salary"
+                    className="border-gray-300 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="presentDays">Present Days</Label>
+                  <Input
+                    id="presentDays"
+                    type="number"
+                    value={presentDays}
+                    onChange={(e) => setPresentDays(e.target.value)}
+                    placeholder="Enter present days"
+                    className="border-gray-300 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="totalDays">Total Days</Label>
+                  <Input
+                    id="totalDays"
+                    type="number"
+                    value={totalDays}
+                    onChange={(e) => setTotalDays(e.target.value)}
+                    placeholder="Enter total days"
+                    className="border-gray-300 focus:border-blue-500"
+                  />
+                </div>
               </div>
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={createEmployeeMutation.isPending}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {createEmployeeMutation.isPending ? "Adding..." : "Add Employee"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="bg-gray-50 border-b">
-                  <CardTitle className="text-lg font-semibold text-gray-800">Employee List</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50">
-                          <TableHead className="font-semibold text-gray-700">Employee ID</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Name</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Position</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Salary</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Present Days</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Total Days</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Calculated Salary</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Paid Amount</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Remaining Amount</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {employees.map((employee) => (
-                          <TableRow key={employee.id} className="hover:bg-gray-50 border-b border-gray-100">
-                            <TableCell className="font-medium text-gray-900">EMP-{employee.id.toString().padStart(4, '0')}</TableCell>
-                            <TableCell className="text-gray-700">{employee.name}</TableCell>
-                            <TableCell className="text-gray-700">{employee.position}</TableCell>
-                            <TableCell className="text-gray-700">₹{employee.monthly_salary.toLocaleString()}</TableCell>
-                            <TableCell className="text-gray-700">{employee.present_days}</TableCell>
-                            <TableCell className="text-gray-700">{employee.total_days}</TableCell>
-                            <TableCell className="font-semibold text-blue-600">₹{employee.calculated_salary.toLocaleString()}</TableCell>
-                            <TableCell className="text-green-600">₹{employee.paid_amount.toLocaleString()}</TableCell>
-                            <TableCell className="font-bold text-red-600">₹{employee.remaining_amount.toLocaleString()}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="border-gray-300 hover:bg-gray-50"
-                                      onClick={() => setSelectedEmployeeId(employee.id)}
-                                    >
-                                      View Payments
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-2xl">
-                                    <DialogHeader>
-                                      <DialogTitle className="text-2xl font-bold text-gray-900">
-                                        Payment History - {employee.name}
-                                      </DialogTitle>
-                                    </DialogHeader>
-                                    <form onSubmit={handleCreatePayment} className="space-y-4">
-                                      <div>
-                                        <Label htmlFor="paymentAmount">Payment Amount</Label>
-                                        <Input
-                                          id="paymentAmount"
-                                          type="number"
-                                          step="0.01"
-                                          value={paymentAmount}
-                                          onChange={(e) => setPaymentAmount(e.target.value)}
-                                          placeholder="Enter payment amount"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label htmlFor="paymentDate">Payment Date</Label>
-                                        <Popover>
-                                          <PopoverTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              className={cn(
-                                                "w-full justify-start text-left font-normal",
-                                                !paymentDate && "text-muted-foreground"
-                                              )}
-                                            >
-                                              <CalendarIcon className="mr-2 h-4 w-4" />
-                                              {paymentDate ? format(paymentDate, "PPP") : <span>Pick a date</span>}
-                                            </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                              mode="single"
-                                              selected={paymentDate}
-                                              onSelect={setPaymentDate}
-                                              disabled={(date) => date > new Date()}
-                                              initialFocus
-                                              className="p-3 pointer-events-auto"
-                                            />
-                                          </PopoverContent>
-                                        </Popover>
-                                      </div>
-                                      <div>
-                                        <Label htmlFor="paymentDescription">Description</Label>
-                                        <Input
-                                          id="paymentDescription"
-                                          value={paymentDescription}
-                                          onChange={(e) => setPaymentDescription(e.target.value)}
-                                          placeholder="Enter description"
-                                        />
-                                      </div>
-                                      <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold">
-                                        Record Payment
-                                      </Button>
-                                    </form>
-
-                                    <Card className="mt-6">
-                                      <CardHeader>
-                                        <CardTitle>Payment History</CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="p-0">
-                                        <Table>
-                                          <TableHeader>
-                                            <TableRow>
-                                              <TableHead>Date</TableHead>
-                                              <TableHead>Amount</TableHead>
-                                              <TableHead>Description</TableHead>
-                                            </TableRow>
-                                          </TableHeader>
-                                          <TableBody>
-                                            {employeePayments.map((payment) => (
-                                              <TableRow key={payment.id}>
-                                                <TableCell>{format(new Date(payment.payment_date), "dd/MM/yyyy")}</TableCell>
-                                                <TableCell>₹{payment.amount.toLocaleString()}</TableCell>
-                                                <TableCell>{payment.description}</TableCell>
-                                              </TableRow>
-                                            ))}
-                                          </TableBody>
-                                        </Table>
-                                      </CardContent>
-                                    </Card>
-                                  </DialogContent>
-                                </Dialog>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="stock" className="space-y-6">
-              <StockManagement />
-            </TabsContent>
-          </Tabs>
-        </div>
+        <Card className="shadow-lg border-0">
+          <CardHeader className="bg-gray-50 border-b">
+            <CardTitle className="text-lg font-semibold text-gray-800">Employee List</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700">Name</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Position</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Salary</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Present Days</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Total Days</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Calculated Salary</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Paid</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Remaining</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {employees.map((employee) => (
+                    <TableRow key={employee.id} className="hover:bg-gray-50 border-b border-gray-100">
+                      <TableCell className="text-gray-700">{employee.name}</TableCell>
+                      <TableCell className="text-gray-700">{employee.position}</TableCell>
+                      <TableCell className="text-gray-700">{employee.monthly_salary}</TableCell>
+                      <TableCell className="text-gray-700">{employee.present_days}</TableCell>
+                      <TableCell className="text-gray-700">{employee.total_days}</TableCell>
+                      <TableCell className="text-gray-700">{employee.calculated_salary}</TableCell>
+                      <TableCell className="text-gray-700">{employee.paid_amount}</TableCell>
+                      <TableCell className="text-gray-700">{employee.remaining_amount}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setSelectedEmployee(employee);
+                          setShowPaymentDialog(true);
+                        }}>
+                          Pay
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {employees.length === 0 && (
+                <div className="text-center py-12">
+                  <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+                  <p className="text-gray-500">New employees will appear here</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Payment for {selectedEmployee?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="paymentAmount" className="text-right">
+                Amount
+              </Label>
+              <Input
+                type="number"
+                id="paymentAmount"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="paymentDescription" className="text-right">
+                Description
+              </Label>
+              <Textarea
+                id="paymentDescription"
+                value={paymentDescription}
+                onChange={(e) => setPaymentDescription(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <form onSubmit={handlePayment}>
+            <Button type="submit">
+              Add Payment
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
