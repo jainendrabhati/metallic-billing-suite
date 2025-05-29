@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, UserPlus, Phone, MapPin } from "lucide-react";
+import { Search, UserPlus, Phone, MapPin, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { customerAPI } from "@/services/api";
 import { format } from "date-fns";
