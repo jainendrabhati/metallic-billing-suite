@@ -21,11 +21,11 @@ export interface Bill {
   tunch: number;
   wages: number;
   wastage: number;
+  rupees: number;
   total_fine: number;
   total_amount: number;
   payment_type: 'credit' | 'debit';
-  payment_status: 'paid' | 'unpaid' | 'partial';
-  partial_amount: number;
+  slip_no: string;
   description: string;
   gst_number: string;
   date: string;
@@ -41,7 +41,7 @@ export interface Transaction {
   customer_name?: string;
   amount: number;
   transaction_type: 'credit' | 'debit';
-  status: 'paid' | 'unpaid' | 'partial';
+  status: 'completed' | 'pending';
   description: string;
   created_at: string;
   updated_at: string;
@@ -81,6 +81,14 @@ export interface EmployeePayment {
   description: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface Stock {
+  id: number;
+  amount: number;
+  transaction_type: 'add' | 'deduct';
+  description: string;
+  created_at: string;
 }
 
 // Customer API
@@ -144,6 +152,11 @@ export const transactionAPI = {
     return response.json();
   },
   
+  getById: async (id: number): Promise<Transaction> => {
+    const response = await fetch(`${API_BASE_URL}/transactions/${id}`);
+    return response.json();
+  },
+  
   exportCSV: async (filters?: { start_date?: string; end_date?: string; customer_name?: string }) => {
     const params = new URLSearchParams();
     if (filters?.start_date) params.append('start_date', filters.start_date);
@@ -161,6 +174,28 @@ export const transactionAPI = {
     if (filters?.customer_name) params.append('customer_name', filters.customer_name);
     
     const response = await fetch(`${API_BASE_URL}/transactions/export/pdf?${params.toString()}`);
+    return response.json();
+  },
+};
+
+// Stock API
+export const stockAPI = {
+  getCurrent: async (): Promise<{ current_stock: number }> => {
+    const response = await fetch(`${API_BASE_URL}/stock`);
+    return response.json();
+  },
+  
+  add: async (amount: number): Promise<{ message: string; new_stock: number }> => {
+    const response = await fetch(`${API_BASE_URL}/stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount }),
+    });
+    return response.json();
+  },
+  
+  getHistory: async (): Promise<Stock[]> => {
+    const response = await fetch(`${API_BASE_URL}/stock/history`);
     return response.json();
   },
 };

@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 import os
-from models import db, Customer, Bill, Transaction, Expense, BillItem
+from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, Stock
 from utils import export_to_csv, export_to_pdf, backup_database, restore_database
 
 app = Flask(__name__)
@@ -68,9 +68,10 @@ def create_bill():
     tunch = float(data['tunch'])
     wastage = float(data['wastage'])
     wages = float(data['wages'])
+    rupees = float(data.get('rupees', 0))
     
     total_fine = weight * ((tunch - wastage) / 100)
-    total_amount = weight * (wages / 1000)
+    total_amount = (weight * (wages / 1000)) + rupees
     
     bill = Bill.create(
         customer_id=data['customer_id'],
@@ -79,15 +80,21 @@ def create_bill():
         tunch=tunch,
         wages=wages,
         wastage=wastage,
+        rupees=rupees,
         total_fine=total_fine,
         total_amount=total_amount,
         payment_type=data['payment_type'],
-        payment_status=data['payment_status'],
-        partial_amount=data.get('partial_amount', 0),
+        slip_no=data.get('slip_no', ''),
         description=data.get('description', ''),
         gst_number=data.get('gst_number', ''),
         date=datetime.strptime(data['date'], '%Y-%m-%d').date()
     )
+    
+    # Update stock based on payment type
+    if data['payment_type'] == 'credit':
+        Stock.add_stock(total_fine)
+    else:  # debit
+        Stock.deduct_stock(total_fine)
     
     # Create transaction
     Transaction.create(
@@ -95,7 +102,7 @@ def create_bill():
         customer_id=data['customer_id'],
         amount=total_amount,
         transaction_type=data['payment_type'],
-        status=data['payment_status'],
+        status='completed',
         description=f"Bill #{bill.id} - {data['item']}"
     )
     
@@ -118,6 +125,13 @@ def get_transactions():
     transactions = Transaction.get_filtered(start_date, end_date, customer_name)
     return jsonify([transaction.to_dict() for transaction in transactions])
 
+@app.route('/api/transactions/<int:transaction_id>', methods=['GET'])
+def get_transaction_details(transaction_id):
+    transaction = Transaction.get_by_id(transaction_id)
+    if transaction:
+        return jsonify(transaction.to_dict())
+    return jsonify({'error': 'Transaction not found'}), 404
+
 @app.route('/api/transactions/export/csv', methods=['GET'])
 def export_transactions_csv():
     start_date = request.args.get('start_date')
@@ -139,6 +153,71 @@ def export_transactions_pdf():
     filename = export_to_pdf(transactions, 'transactions')
     
     return jsonify({'filename': filename, 'message': 'Export successful'})
+
+# Employee APIs
+@app.route('/api/employees', methods=['GET'])
+def get_employees():
+    employees = Employee.get_all()
+    return jsonify([employee.to_dict() for employee in employees])
+
+@app.route('/api/employees', methods=['POST'])
+def create_employee():
+    data = request.json
+    employee = Employee.create(
+        name=data['name'],
+        position=data['position'],
+        monthly_salary=float(data['monthly_salary']),
+        present_days=int(data['present_days']),
+        total_days=int(data['total_days'])
+    )
+    return jsonify(employee.to_dict()), 201
+
+@app.route('/api/employees/<int:employee_id>', methods=['PUT'])
+def update_employee(employee_id):
+    data = request.json
+    employee = Employee.update(employee_id, data)
+    if employee:
+        return jsonify(employee.to_dict())
+    return jsonify({'error': 'Employee not found'}), 404
+
+@app.route('/api/employees/<int:employee_id>', methods=['GET'])
+def get_employee(employee_id):
+    employee = Employee.get_by_id(employee_id)
+    if employee:
+        return jsonify(employee.to_dict())
+    return jsonify({'error': 'Employee not found'}), 404
+
+# Employee Payment APIs
+@app.route('/api/employee-payments', methods=['GET'])
+def get_employee_payments():
+    payments = EmployeePayment.get_all()
+    return jsonify([payment.to_dict() for payment in payments])
+
+@app.route('/api/employee-payments/employee/<int:employee_id>', methods=['GET'])
+def get_employee_payments_by_employee(employee_id):
+    payments = EmployeePayment.get_by_employee_id(employee_id)
+    return jsonify([payment.to_dict() for payment in payments])
+
+@app.route('/api/employee-payments', methods=['POST'])
+def create_employee_payment():
+    data = request.json
+    payment = EmployeePayment.create(
+        employee_id=data['employee_id'],
+        amount=float(data['amount']),
+        payment_date=datetime.strptime(data['payment_date'], '%Y-%m-%d').date(),
+        description=data.get('description', '')
+    )
+    
+    # Create expense entry for employee payment
+    Expense.create(
+        description=f"Salary payment to {payment.employee.name}",
+        amount=payment.amount,
+        category='Employee Salary',
+        status='paid',
+        date=payment.payment_date
+    )
+    
+    return jsonify(payment.to_dict()), 201
 
 # Expense APIs
 @app.route('/api/expenses', methods=['GET'])
@@ -166,6 +245,24 @@ def update_expense(expense_id):
         return jsonify(expense.to_dict())
     return jsonify({'error': 'Expense not found'}), 404
 
+# Stock APIs
+@app.route('/api/stock', methods=['GET'])
+def get_stock():
+    stock = Stock.get_current_stock()
+    return jsonify({'current_stock': stock})
+
+@app.route('/api/stock', methods=['POST'])
+def add_stock():
+    data = request.json
+    amount = float(data['amount'])
+    Stock.add_stock(amount)
+    return jsonify({'message': 'Stock added successfully', 'new_stock': Stock.get_current_stock()})
+
+@app.route('/api/stock/history', methods=['GET'])
+def get_stock_history():
+    history = Stock.get_all()
+    return jsonify([stock.to_dict() for stock in history])
+
 # Settings APIs
 @app.route('/api/settings/backup', methods=['GET'])
 def download_backup():
@@ -189,7 +286,6 @@ def upload_backup():
 
 @app.route('/api/settings/firm', methods=['GET'])
 def get_firm_settings():
-    # Return default firm settings or from database
     return jsonify({
         'firm_name': 'Metalic Jewelers',
         'gst_number': '24ABCDE1234F1Z5',
@@ -200,7 +296,6 @@ def get_firm_settings():
 @app.route('/api/settings/firm', methods=['POST'])
 def update_firm_settings():
     data = request.json
-    # Save firm settings to database or config file
     return jsonify({'message': 'Settings updated successfully'})
 
 if __name__ == '__main__':

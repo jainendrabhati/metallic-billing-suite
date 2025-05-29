@@ -70,11 +70,11 @@ class Bill(db.Model):
     tunch = db.Column(db.Float, nullable=False)
     wages = db.Column(db.Float, nullable=False)
     wastage = db.Column(db.Float, nullable=False)
+    rupees = db.Column(db.Float, default=0.0)
     total_fine = db.Column(db.Float, nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
     payment_type = db.Column(db.String(10), nullable=False)  # credit/debit
-    payment_status = db.Column(db.String(10), nullable=False)  # paid/unpaid/partial
-    partial_amount = db.Column(db.Float, default=0.0)
+    slip_no = db.Column(db.String(50))
     description = db.Column(db.Text)
     gst_number = db.Column(db.String(20))
     date = db.Column(db.Date, nullable=False)
@@ -94,11 +94,11 @@ class Bill(db.Model):
             'tunch': self.tunch,
             'wages': self.wages,
             'wastage': self.wastage,
+            'rupees': self.rupees,
             'total_fine': self.total_fine,
             'total_amount': self.total_amount,
             'payment_type': self.payment_type,
-            'payment_status': self.payment_status,
-            'partial_amount': self.partial_amount,
+            'slip_no': self.slip_no,
             'description': self.description,
             'gst_number': self.gst_number,
             'date': self.date.isoformat() if self.date else None,
@@ -139,7 +139,7 @@ class Transaction(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     transaction_type = db.Column(db.String(10), nullable=False)  # credit/debit
-    status = db.Column(db.String(10), nullable=False)  # paid/unpaid/partial
+    status = db.Column(db.String(10), nullable=False)  # completed/pending
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -171,6 +171,10 @@ class Transaction(db.Model):
         return cls.query.order_by(cls.created_at.desc()).all()
 
     @classmethod
+    def get_by_id(cls, transaction_id):
+        return cls.query.get(transaction_id)
+
+    @classmethod
     def get_filtered(cls, start_date=None, end_date=None, customer_name=None):
         query = cls.query
         
@@ -186,6 +190,172 @@ class Transaction(db.Model):
             query = query.join(Customer).filter(Customer.name.contains(customer_name))
         
         return query.order_by(cls.created_at.desc()).all()
+
+class Employee(db.Model):
+    __tablename__ = 'employees'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    position = db.Column(db.String(100), nullable=False)
+    monthly_salary = db.Column(db.Float, nullable=False)
+    present_days = db.Column(db.Integer, nullable=False)
+    total_days = db.Column(db.Integer, nullable=False)
+    calculated_salary = db.Column(db.Float, nullable=False)
+    paid_amount = db.Column(db.Float, default=0.0)
+    remaining_amount = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    payments = db.relationship('EmployeePayment', backref='employee', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'position': self.position,
+            'monthly_salary': self.monthly_salary,
+            'present_days': self.present_days,
+            'total_days': self.total_days,
+            'calculated_salary': self.calculated_salary,
+            'paid_amount': self.paid_amount,
+            'remaining_amount': self.remaining_amount,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def create(cls, name, position, monthly_salary, present_days, total_days):
+        calculated_salary = (monthly_salary * present_days) / total_days
+        employee = cls(
+            name=name,
+            position=position,
+            monthly_salary=monthly_salary,
+            present_days=present_days,
+            total_days=total_days,
+            calculated_salary=calculated_salary,
+            remaining_amount=calculated_salary
+        )
+        db.session.add(employee)
+        db.session.commit()
+        return employee
+
+    @classmethod
+    def get_all(cls):
+        return cls.query.all()
+
+    @classmethod
+    def get_by_id(cls, employee_id):
+        return cls.query.get(employee_id)
+
+    @classmethod
+    def update(cls, employee_id, data):
+        employee = cls.get_by_id(employee_id)
+        if employee:
+            for key, value in data.items():
+                if hasattr(employee, key):
+                    setattr(employee, key, value)
+            
+            # Recalculate salary if relevant fields changed
+            if 'monthly_salary' in data or 'present_days' in data or 'total_days' in data:
+                employee.calculated_salary = (employee.monthly_salary * employee.present_days) / employee.total_days
+                employee.remaining_amount = employee.calculated_salary - employee.paid_amount
+            
+            employee.updated_at = datetime.utcnow()
+            db.session.commit()
+        return employee
+
+    def update_payments(self):
+        payments = EmployeePayment.query.filter_by(employee_id=self.id).all()
+        self.paid_amount = sum(payment.amount for payment in payments)
+        self.remaining_amount = self.calculated_salary - self.paid_amount
+        db.session.commit()
+
+class EmployeePayment(db.Model):
+    __tablename__ = 'employee_payments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    payment_date = db.Column(db.Date, nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'employee_id': self.employee_id,
+            'employee_name': self.employee.name if self.employee else None,
+            'amount': self.amount,
+            'payment_date': self.payment_date.isoformat() if self.payment_date else None,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def create(cls, **kwargs):
+        payment = cls(**kwargs)
+        db.session.add(payment)
+        db.session.commit()
+        
+        # Update employee payment totals
+        employee = Employee.get_by_id(payment.employee_id)
+        if employee:
+            employee.update_payments()
+        
+        return payment
+
+    @classmethod
+    def get_all(cls):
+        return cls.query.order_by(cls.created_at.desc()).all()
+
+    @classmethod
+    def get_by_employee_id(cls, employee_id):
+        return cls.query.filter_by(employee_id=employee_id).order_by(cls.created_at.desc()).all()
+
+class Stock(db.Model):
+    __tablename__ = 'stock'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    amount = db.Column(db.Float, nullable=False)
+    transaction_type = db.Column(db.String(10), nullable=False)  # add/deduct
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'amount': self.amount,
+            'transaction_type': self.transaction_type,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+    @classmethod
+    def add_stock(cls, amount, description="Stock added from credit bill"):
+        stock = cls(amount=amount, transaction_type='add', description=description)
+        db.session.add(stock)
+        db.session.commit()
+        return stock
+
+    @classmethod
+    def deduct_stock(cls, amount, description="Stock deducted from debit bill"):
+        stock = cls(amount=amount, transaction_type='deduct', description=description)
+        db.session.add(stock)
+        db.session.commit()
+        return stock
+
+    @classmethod
+    def get_current_stock(cls):
+        added = db.session.query(db.func.sum(cls.amount)).filter_by(transaction_type='add').scalar() or 0
+        deducted = db.session.query(db.func.sum(cls.amount)).filter_by(transaction_type='deduct').scalar() or 0
+        return added - deducted
+
+    @classmethod
+    def get_all(cls):
+        return cls.query.order_by(cls.created_at.desc()).all()
 
 class Expense(db.Model):
     __tablename__ = 'expenses'
