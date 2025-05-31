@@ -1,3 +1,4 @@
+
 import {
   BarChart3,
   CreditCard,
@@ -10,7 +11,7 @@ import {
   Clock,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { useSidebar } from "@/providers/SidebarProvider";
+import { useSidebar } from "@/components/SidebarProvider";
 import { useEffect, useState } from "react";
 
 const items = [
