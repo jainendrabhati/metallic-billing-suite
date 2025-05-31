@@ -204,6 +204,24 @@ export const stockAPI = {
     return response.json();
   },
   
+  addTransaction: async (amount: number, type: "add" | "deduct", description: string): Promise<{ message: string; new_stock: number }> => {
+    const response = await fetch(`${API_BASE_URL}/stock/transaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, transaction_type: type, description }),
+    });
+    return response.json();
+  },
+  
+  updateStock: async (amount: number, type: "add" | "deduct", description: string): Promise<{ message: string; new_stock: number }> => {
+    const response = await fetch(`${API_BASE_URL}/stock/update`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, transaction_type: type, description }),
+    });
+    return response.json();
+  },
+  
   getHistory: async (): Promise<Stock[]> => {
     const response = await fetch(`${API_BASE_URL}/stock/history`);
     return response.json();

@@ -261,6 +261,36 @@ def add_stock():
     Stock.add_stock(amount)
     return jsonify({'message': 'Stock added successfully', 'new_stock': Stock.get_current_stock()})
 
+@app.route('/api/stock/transaction', methods=['POST'])
+def add_stock_transaction():
+    data = request.json
+    amount = float(data['amount'])
+    transaction_type = data['transaction_type']
+    description = data.get('description', f'Manual {transaction_type}')
+    
+    if transaction_type == 'add':
+        Stock.add_stock(amount, description)
+    else:
+        Stock.deduct_stock(amount, description)
+    
+    return jsonify({'message': 'Stock transaction completed successfully', 'new_stock': Stock.get_current_stock()})
+
+@app.route('/api/stock/update', methods=['PUT'])
+def update_stock():
+    data = request.json
+    new_amount = float(data['amount'])
+    description = data.get('description', 'Stock adjustment')
+    
+    current_stock = Stock.get_current_stock()
+    difference = new_amount - current_stock
+    
+    if difference > 0:
+        Stock.add_stock(difference, f"Stock adjustment (increase): {description}")
+    elif difference < 0:
+        Stock.deduct_stock(abs(difference), f"Stock adjustment (decrease): {description}")
+    
+    return jsonify({'message': 'Stock updated successfully', 'new_stock': Stock.get_current_stock()})
+
 @app.route('/api/stock/history', methods=['GET'])
 def get_stock_history():
     history = Stock.get_all()
