@@ -14,6 +14,7 @@ import { format } from "date-fns";
 
 const StockManagement = () => {
   const [addAmount, setAddAmount] = useState("");
+  const [description, setDescription] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -28,7 +29,8 @@ const StockManagement = () => {
   });
 
   const addStockMutation = useMutation({
-    mutationFn: stockAPI.add,
+    mutationFn: ({ amount, desc }: { amount: number; desc: string }) => 
+      stockAPI.addTransaction(amount, 'add', 'General Stock', desc),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock'] });
       toast({
@@ -36,6 +38,7 @@ const StockManagement = () => {
         description: "Stock added successfully!",
       });
       setAddAmount("");
+      setDescription("");
     },
     onError: () => {
       toast({
@@ -56,7 +59,10 @@ const StockManagement = () => {
       });
       return;
     }
-    addStockMutation.mutate(parseFloat(addAmount));
+    addStockMutation.mutate({ 
+      amount: parseFloat(addAmount), 
+      desc: description || "Manual stock addition" 
+    });
   };
 
   return (
@@ -87,6 +93,16 @@ const StockManagement = () => {
                   value={addAmount}
                   onChange={(e) => setAddAmount(e.target.value)}
                   placeholder="Enter amount to add"
+                  className="border-gray-300 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter description (optional)"
                   className="border-gray-300 focus:border-blue-500"
                 />
               </div>

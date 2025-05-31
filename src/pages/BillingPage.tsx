@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +29,7 @@ const BillingPage = () => {
   const [tunch, setTunch] = useState("");
   const [wages, setWages] = useState("");
   const [wastage, setWastage] = useState("");
-  const [rupees, setRupees] = useState("");
+  const [silverAmount, setSilverAmount] = useState("");
   const [slipNo, setSlipNo] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [paymentType, setPaymentType] = useState<"credit" | "debit">("credit");
@@ -42,7 +41,7 @@ const BillingPage = () => {
   const totalFine = weight && tunch && wastage ? 
     parseFloat(weight) * ((parseFloat(tunch) - parseFloat(wastage)) / 100) : 0;
   const totalAmount = (weight && wages ? parseFloat(weight) * (parseFloat(wages) / 1000) : 0) + 
-                     (rupees ? parseFloat(rupees) : 0);
+                     (paymentType === 'credit' && silverAmount ? parseFloat(silverAmount) : 0);
 
   // Queries
   const { data: customers = [] } = useQuery({
@@ -123,7 +122,7 @@ const BillingPage = () => {
     setTunch("");
     setWages("");
     setWastage("");
-    setRupees("");
+    setSilverAmount("");
     setSlipNo("");
     setDate(new Date());
     setPaymentType("credit");
@@ -175,7 +174,7 @@ const BillingPage = () => {
         tunch: parseFloat(tunch),
         wages: parseFloat(wages),
         wastage: parseFloat(wastage),
-        rupees: parseFloat(rupees || "0"),
+        silver_amount: parseFloat(silverAmount || "0"),
         payment_type: paymentType,
         slip_no: slipNo,
         description,
@@ -367,18 +366,20 @@ const BillingPage = () => {
                           className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="rupees" className="text-sm">Rupees Amount</Label>
-                        <Input
-                          id="rupees"
-                          type="number"
-                          step="0.01"
-                          value={rupees}
-                          onChange={(e) => setRupees(e.target.value)}
-                          placeholder="0.00"
-                          className="border-gray-300 focus:border-blue-500 text-sm"
-                        />
-                      </div>
+                      {paymentType === 'credit' && (
+                        <div>
+                          <Label htmlFor="silverAmount" className="text-sm">Silver Amount</Label>
+                          <Input
+                            id="silverAmount"
+                            type="number"
+                            step="0.01"
+                            value={silverAmount}
+                            onChange={(e) => setSilverAmount(e.target.value)}
+                            placeholder="0.00"
+                            className="border-gray-300 focus:border-blue-500 text-sm"
+                          />
+                        </div>
+                      )}
                       <div>
                         <Label className="text-sm">Payment Type *</Label>
                         <Select value={paymentType} onValueChange={(value: "credit" | "debit") => setPaymentType(value)}>

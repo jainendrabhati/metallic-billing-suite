@@ -108,6 +108,7 @@ export interface Stock {
   id: number;
   amount: number;
   transaction_type: 'add' | 'deduct';
+  item_name: string;
   description: string;
   created_at: string;
 }
