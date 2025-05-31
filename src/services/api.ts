@@ -116,6 +116,16 @@ export const customerAPI = {
     const response = await fetch(`${API_BASE_URL}/customers/${id}`);
     return response.json();
   },
+
+  getPending: async (): Promise<any[]> => {
+    const response = await fetch(`${API_BASE_URL}/customers/pending`);
+    return response.json();
+  },
+
+  getBills: async (customerId: number): Promise<Bill[]> => {
+    const response = await fetch(`${API_BASE_URL}/customers/${customerId}/bills`);
+    return response.json();
+  },
 };
 
 // Bill API

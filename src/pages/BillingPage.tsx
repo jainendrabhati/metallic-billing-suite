@@ -186,116 +186,118 @@ const BillingPage = () => {
   };
 
   return (
-    <div className="space-y-6 bg-gray-50 min-h-screen p-6">
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-6">
+    <div className="h-screen overflow-hidden bg-gray-50 flex flex-col">
+      <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Professional Billing Suite</h1>
-            <p className="text-gray-600 mt-1">Create and manage billing transactions efficiently</p>
+            <h1 className="text-2xl font-bold text-gray-900">Professional Billing Suite</h1>
+            <p className="text-gray-600 text-sm">Create and manage billing transactions efficiently</p>
           </div>
-          <Button onClick={resetForm} variant="outline" className="flex items-center gap-2 border-gray-300">
+          <Button onClick={resetForm} variant="outline" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Reset Form
           </Button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
           {/* Billing Form */}
-          <div className="lg:col-span-2">
-            <Card className="shadow-lg border-0">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                <CardTitle className="text-xl">Create New Bill</CardTitle>
+          <div className="lg:col-span-2 h-full overflow-y-auto">
+            <Card className="h-full flex flex-col shadow-lg border-0">
+              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white flex-shrink-0">
+                <CardTitle className="text-lg">Create New Bill</CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
-                <form onSubmit={handleSubmit} className="space-y-6">
+              <CardContent className="flex-1 overflow-y-auto p-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Customer Information */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <h3 className="text-base font-semibold text-gray-800 mb-3">Customer Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="relative">
-                        <Label htmlFor="customerName">Customer Name *</Label>
+                        <Label htmlFor="customerName" className="text-sm">Customer Name *</Label>
                         <Input
                           id="customerName"
                           value={customerName}
                           onChange={(e) => handleCustomerNameChange(e.target.value)}
                           placeholder="Enter customer name"
                           autoComplete="off"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                         {showCustomerSuggestions && searchResults.length > 0 && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-auto">
                             {searchResults.map((customer) => (
                               <div
                                 key={customer.id}
-                                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                                 onClick={() => handleCustomerSelect(customer)}
                               >
-                                <div className="font-medium">{customer.name}</div>
-                                <div className="text-sm text-gray-500">{customer.mobile}</div>
+                                <div className="font-medium text-sm">{customer.name}</div>
+                                <div className="text-xs text-gray-500">{customer.mobile}</div>
                               </div>
                             ))}
                           </div>
                         )}
                       </div>
                       <div>
-                        <Label htmlFor="mobile">Mobile *</Label>
+                        <Label htmlFor="mobile" className="text-sm">Mobile *</Label>
                         <Input
                           id="mobile"
                           value={mobile}
                           onChange={(e) => setMobile(e.target.value)}
                           placeholder="Enter mobile number"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="address">Address *</Label>
+                        <Label htmlFor="address" className="text-sm">Address *</Label>
                         <Input
                           id="address"
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
                           placeholder="Enter address"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Bill Details */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Bill Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <h3 className="text-base font-semibold text-gray-800 mb-3">Bill Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <Label htmlFor="item">Item *</Label>
+                        <Label htmlFor="item" className="text-sm">Item *</Label>
                         <Input
                           id="item"
                           value={item}
                           onChange={(e) => setItem(e.target.value)}
                           placeholder="Enter item name"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="slipNo">Slip Number</Label>
+                        <Label htmlFor="slipNo" className="text-sm">Slip Number</Label>
                         <Input
                           id="slipNo"
                           value={slipNo}
                           onChange={(e) => setSlipNo(e.target.value)}
                           placeholder="Enter slip number"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="date">Date *</Label>
+                        <Label htmlFor="date" className="text-sm">Date *</Label>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
                               className={cn(
-                                "w-full justify-start text-left font-normal border-gray-300",
+                                "w-full justify-start text-left font-normal border-gray-300 text-sm",
                                 !date && "text-muted-foreground"
                               )}
                             >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              <CalendarIcon className="mr-2 h-3 w-3" />
                               {date ? format(date, "PPP") : <span>Pick a date</span>}
                             </Button>
                           </PopoverTrigger>
@@ -306,7 +308,6 @@ const BillingPage = () => {
                               onSelect={setDate}
                               disabled={(date) => date > new Date()}
                               initialFocus
-                              className="p-3 pointer-events-auto"
                             />
                           </PopoverContent>
                         </Popover>
@@ -315,11 +316,11 @@ const BillingPage = () => {
                   </div>
 
                   {/* Weight and Calculations */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Measurements & Calculations</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <h3 className="text-base font-semibold text-gray-800 mb-3">Measurements & Calculations</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
-                        <Label htmlFor="weight">Weight (grams) *</Label>
+                        <Label htmlFor="weight" className="text-sm">Weight (grams) *</Label>
                         <Input
                           id="weight"
                           type="number"
@@ -327,11 +328,11 @@ const BillingPage = () => {
                           value={weight}
                           onChange={(e) => setWeight(e.target.value)}
                           placeholder="0.00"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="tunch">Tunch *</Label>
+                        <Label htmlFor="tunch" className="text-sm">Tunch *</Label>
                         <Input
                           id="tunch"
                           type="number"
@@ -339,11 +340,11 @@ const BillingPage = () => {
                           value={tunch}
                           onChange={(e) => setTunch(e.target.value)}
                           placeholder="0.00"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="wages">Wages *</Label>
+                        <Label htmlFor="wages" className="text-sm">Wages *</Label>
                         <Input
                           id="wages"
                           type="number"
@@ -351,11 +352,11 @@ const BillingPage = () => {
                           value={wages}
                           onChange={(e) => setWages(e.target.value)}
                           placeholder="0.00"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="wastage">Wastage *</Label>
+                        <Label htmlFor="wastage" className="text-sm">Wastage *</Label>
                         <Input
                           id="wastage"
                           type="number"
@@ -363,11 +364,11 @@ const BillingPage = () => {
                           value={wastage}
                           onChange={(e) => setWastage(e.target.value)}
                           placeholder="0.00"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="rupees">Rupees Amount</Label>
+                        <Label htmlFor="rupees" className="text-sm">Rupees Amount</Label>
                         <Input
                           id="rupees"
                           type="number"
@@ -375,13 +376,13 @@ const BillingPage = () => {
                           value={rupees}
                           onChange={(e) => setRupees(e.target.value)}
                           placeholder="0.00"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label>Payment Type *</Label>
+                        <Label className="text-sm">Payment Type *</Label>
                         <Select value={paymentType} onValueChange={(value: "credit" | "debit") => setPaymentType(value)}>
-                          <SelectTrigger className="border-gray-300">
+                          <SelectTrigger className="border-gray-300 text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -394,51 +395,51 @@ const BillingPage = () => {
                   </div>
 
                   {/* Calculated Results */}
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h3 className="text-lg font-semibold text-blue-800 mb-4">Calculated Results</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <h3 className="text-base font-semibold text-blue-800 mb-3">Calculated Results</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <Label>Total Fine (grams)</Label>
+                        <Label className="text-sm">Total Fine (grams)</Label>
                         <Input
                           value={totalFine.toFixed(4)}
                           readOnly
-                          className="bg-white font-semibold text-blue-600"
+                          className="bg-white font-semibold text-blue-600 text-sm"
                         />
                       </div>
                       <div>
-                        <Label>Total Amount</Label>
+                        <Label className="text-sm">Total Amount</Label>
                         <Input
                           value={`₹${totalAmount.toFixed(2)}`}
                           readOnly
-                          className="bg-white font-bold text-green-600 text-lg"
+                          className="bg-white font-bold text-green-600 text-sm"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Additional Information */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <h3 className="text-base font-semibold text-gray-800 mb-3">Additional Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="description">Description</Label>
+                        <Label htmlFor="description" className="text-sm">Description</Label>
                         <Textarea
                           id="description"
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
                           placeholder="Enter description"
-                          rows={3}
-                          className="border-gray-300 focus:border-blue-500"
+                          rows={2}
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="gstNumber">GST Number</Label>
+                        <Label htmlFor="gstNumber" className="text-sm">GST Number</Label>
                         <Input
                           id="gstNumber"
                           value={gstNumber}
                           onChange={(e) => setGstNumber(e.target.value)}
                           placeholder="Enter GST number"
-                          className="border-gray-300 focus:border-blue-500"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
                     </div>
@@ -446,7 +447,7 @@ const BillingPage = () => {
 
                   <Button 
                     type="submit" 
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-lg" 
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2" 
                     disabled={createBillMutation.isPending}
                   >
                     {createBillMutation.isPending ? "Creating Bill..." : "Create Professional Bill"}
@@ -457,31 +458,31 @@ const BillingPage = () => {
           </div>
 
           {/* Recent Bills */}
-          <div>
-            <Card className="shadow-lg border-0">
-              <CardHeader className="bg-gradient-to-r from-green-600 to-green-700 text-white">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <FileText className="h-5 w-5" />
+          <div className="h-full overflow-y-auto">
+            <Card className="h-full flex flex-col shadow-lg border-0">
+              <CardHeader className="bg-gradient-to-r from-green-600 to-green-700 text-white flex-shrink-0">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileText className="h-4 w-4" />
                   Recent Bills
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  {bills.slice(0, 5).map((bill) => (
-                    <div key={bill.id} className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+              <CardContent className="flex-1 overflow-y-auto p-3">
+                <div className="space-y-2">
+                  {bills.slice(0, 10).map((bill) => (
+                    <div key={bill.id} className="p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                       <div className="flex justify-between items-start">
                         <div>
-                          <div className="font-bold text-gray-900">Bill #{bill.id}</div>
-                          <div className="text-sm text-gray-600 font-medium">{bill.customer_name}</div>
-                          <div className="text-sm text-gray-500">{bill.item}</div>
+                          <div className="font-bold text-gray-900 text-sm">Bill #{bill.id}</div>
+                          <div className="text-xs text-gray-600 font-medium">{bill.customer_name}</div>
+                          <div className="text-xs text-gray-500">{bill.item}</div>
                           {bill.slip_no && <div className="text-xs text-blue-600">Slip: {bill.slip_no}</div>}
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-green-600 text-lg">₹{bill.total_amount.toFixed(2)}</div>
+                          <div className="font-bold text-green-600 text-sm">₹{bill.total_amount.toFixed(2)}</div>
                           <div className="text-xs text-gray-500">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
                           <div className="text-xs">
                             <Badge variant={bill.payment_type === 'credit' ? 'default' : 'secondary'} 
-                                   className={bill.payment_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                   className={`text-xs ${bill.payment_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                               {bill.payment_type.toUpperCase()}
                             </Badge>
                           </div>

@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
@@ -53,6 +52,17 @@ def search_customers():
     customers = Customer.search_by_name(query)
     return jsonify([customer.to_dict() for customer in customers])
 
+# Pending List API
+@app.route('/api/customers/pending', methods=['GET'])
+def get_pending_customers():
+    customers = Customer.get_pending_customers()
+    return jsonify([customer for customer in customers])
+
+@app.route('/api/customers/<int:customer_id>/bills', methods=['GET'])
+def get_customer_bills(customer_id):
+    bills = Bill.get_by_customer(customer_id)
+    return jsonify([bill.to_dict() for bill in bills])
+
 # Bill APIs
 @app.route('/api/bills', methods=['GET'])
 def get_bills():
@@ -90,11 +100,11 @@ def create_bill():
         date=datetime.strptime(data['date'], '%Y-%m-%d').date()
     )
     
-    # Update stock based on payment type
+    # Update stock based on payment type and item type
     if data['payment_type'] == 'credit':
-        Stock.add_stock(total_fine)
+        Stock.add_stock(total_fine, f"Credit bill #{bill.id} - {data['item']}")
     else:  # debit
-        Stock.deduct_stock(total_fine)
+        Stock.deduct_stock(total_fine, f"Debit bill #{bill.id} - {data['item']}")
     
     # Create transaction
     Transaction.create(
@@ -107,13 +117,6 @@ def create_bill():
     )
     
     return jsonify(bill.to_dict()), 201
-
-@app.route('/api/bills/<int:bill_id>', methods=['GET'])
-def get_bill(bill_id):
-    bill = Bill.get_by_id(bill_id)
-    if bill:
-        return jsonify(bill.to_dict())
-    return jsonify({'error': 'Bill not found'}), 404
 
 # Transaction APIs
 @app.route('/api/transactions', methods=['GET'])
