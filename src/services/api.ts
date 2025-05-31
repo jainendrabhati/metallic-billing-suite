@@ -21,7 +21,7 @@ export interface Bill {
   tunch: number;
   wages: number;
   wastage: number;
-  rupees: number;
+  silver_amount: number; // renamed from rupees
   total_fine: number;
   total_amount: number;
   payment_type: 'credit' | 'debit';
@@ -31,6 +31,27 @@ export interface Bill {
   date: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface StockItem {
+  id: number;
+  item_name: string;
+  current_weight: number;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseDashboard {
+  total_expenses: number;
+  net_fine: number;
+  total_bill_amount: number;
+  total_silver_amount: number;
+  total_wages_weight: number;
+  balance_sheet: {
+    silver_balance: number;
+    rupee_balance: number;
+  };
 }
 
 export interface Transaction {
@@ -150,6 +171,39 @@ export const billAPI = {
   },
 };
 
+// Stock Item API
+export const stockItemAPI = {
+  getAll: async (): Promise<StockItem[]> => {
+    const response = await fetch(`${API_BASE_URL}/stock-items`);
+    return response.json();
+  },
+  
+  create: async (item: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>): Promise<StockItem> => {
+    const response = await fetch(`${API_BASE_URL}/stock-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    });
+    return response.json();
+  },
+  
+  update: async (id: number, item: Partial<StockItem>): Promise<StockItem> => {
+    const response = await fetch(`${API_BASE_URL}/stock-items/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    });
+    return response.json();
+  },
+  
+  delete: async (id: number): Promise<{ message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/stock-items/${id}`, {
+      method: 'DELETE',
+    });
+    return response.json();
+  },
+};
+
 // Transaction API
 export const transactionAPI = {
   getAll: async (filters?: { start_date?: string; end_date?: string; customer_name?: string }): Promise<Transaction[]> => {
@@ -188,36 +242,18 @@ export const transactionAPI = {
   },
 };
 
-// Stock API
+// Enhanced Stock API
 export const stockAPI = {
   getCurrent: async (): Promise<{ current_stock: number }> => {
     const response = await fetch(`${API_BASE_URL}/stock`);
     return response.json();
   },
   
-  add: async (amount: number): Promise<{ message: string; new_stock: number }> => {
-    const response = await fetch(`${API_BASE_URL}/stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount }),
-    });
-    return response.json();
-  },
-  
-  addTransaction: async (amount: number, type: "add" | "deduct", description: string): Promise<{ message: string; new_stock: number }> => {
+  addTransaction: async (amount: number, type: "add" | "deduct", item_name: string, description: string): Promise<{ message: string; new_stock: number }> => {
     const response = await fetch(`${API_BASE_URL}/stock/transaction`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, transaction_type: type, description }),
-    });
-    return response.json();
-  },
-  
-  updateStock: async (amount: number, type: "add" | "deduct", description: string): Promise<{ message: string; new_stock: number }> => {
-    const response = await fetch(`${API_BASE_URL}/stock/update`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, transaction_type: type, description }),
+      body: JSON.stringify({ amount, transaction_type: type, item_name, description }),
     });
     return response.json();
   },
@@ -228,10 +264,15 @@ export const stockAPI = {
   },
 };
 
-// Expense API
+// Enhanced Expense API
 export const expenseAPI = {
   getAll: async (): Promise<Expense[]> => {
     const response = await fetch(`${API_BASE_URL}/expenses`);
+    return response.json();
+  },
+  
+  getDashboard: async (): Promise<ExpenseDashboard> => {
+    const response = await fetch(`${API_BASE_URL}/expenses/dashboard`);
     return response.json();
   },
   

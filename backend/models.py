@@ -103,7 +103,7 @@ class Bill(db.Model):
     tunch = db.Column(db.Float, nullable=False)
     wages = db.Column(db.Float, nullable=False)
     wastage = db.Column(db.Float, nullable=False)
-    rupees = db.Column(db.Float, default=0.0)
+    silver_amount = db.Column(db.Float, default=0.0)  # renamed from rupees
     total_fine = db.Column(db.Float, nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
     payment_type = db.Column(db.String(10), nullable=False)  # credit/debit
@@ -127,7 +127,7 @@ class Bill(db.Model):
             'tunch': self.tunch,
             'wages': self.wages,
             'wastage': self.wastage,
-            'rupees': self.rupees,
+            'silver_amount': self.silver_amount,
             'total_fine': self.total_fine,
             'total_amount': self.total_amount,
             'payment_type': self.payment_type,
@@ -348,10 +348,65 @@ class EmployeePayment(db.Model):
     def get_by_employee_id(cls, employee_id):
         return cls.query.filter_by(employee_id=employee_id).order_by(cls.created_at.desc()).all()
 
+class StockItem(db.Model):
+    __tablename__ = 'stock_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    item_name = db.Column(db.String(100), nullable=False, unique=True)
+    current_weight = db.Column(db.Float, default=0.0)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'item_name': self.item_name,
+            'current_weight': self.current_weight,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def create(cls, item_name, current_weight=0.0, description=""):
+        item = cls(item_name=item_name, current_weight=current_weight, description=description)
+        db.session.add(item)
+        db.session.commit()
+        return item
+
+    @classmethod
+    def get_all(cls):
+        return cls.query.all()
+
+    @classmethod
+    def get_by_id(cls, item_id):
+        return cls.query.get(item_id)
+
+    @classmethod
+    def get_by_name(cls, item_name):
+        return cls.query.filter_by(item_name=item_name).first()
+
+    @classmethod
+    def update_stock(cls, item_name, weight_change, transaction_type):
+        item = cls.get_by_name(item_name)
+        if not item:
+            item = cls.create(item_name, 0.0, f"Auto-created for {item_name}")
+        
+        if transaction_type == 'add':
+            item.current_weight += weight_change
+        else:  # deduct
+            item.current_weight -= weight_change
+        
+        item.updated_at = datetime.utcnow()
+        db.session.commit()
+        return item
+
 class Stock(db.Model):
     __tablename__ = 'stock'
     
     id = db.Column(db.Integer, primary_key=True)
+    item_name = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     transaction_type = db.Column(db.String(10), nullable=False)  # add/deduct
     description = db.Column(db.Text)
@@ -360,6 +415,7 @@ class Stock(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'item_name': self.item_name,
             'amount': self.amount,
             'transaction_type': self.transaction_type,
             'description': self.description,
@@ -367,17 +423,23 @@ class Stock(db.Model):
         }
 
     @classmethod
-    def add_stock(cls, amount, description="Stock added from credit bill"):
-        stock = cls(amount=amount, transaction_type='add', description=description)
+    def add_stock(cls, item_name, amount, description="Stock added from credit bill"):
+        stock = cls(item_name=item_name, amount=amount, transaction_type='add', description=description)
         db.session.add(stock)
         db.session.commit()
+        
+        # Update stock item
+        StockItem.update_stock(item_name, amount, 'add')
         return stock
 
     @classmethod
-    def deduct_stock(cls, amount, description="Stock deducted from debit bill"):
-        stock = cls(amount=amount, transaction_type='deduct', description=description)
+    def deduct_stock(cls, item_name, amount, description="Stock deducted from debit bill"):
+        stock = cls(item_name=item_name, amount=amount, transaction_type='deduct', description=description)
         db.session.add(stock)
         db.session.commit()
+        
+        # Update stock item
+        StockItem.update_stock(item_name, amount, 'deduct')
         return stock
 
     @classmethod

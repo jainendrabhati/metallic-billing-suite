@@ -10,16 +10,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar as CalendarIcon, CreditCard, Edit } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, CreditCard, Edit, TrendingUp, TrendingDown, DollarSign, Scale, Moon, Sun } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { expenseAPI, Expense } from "@/services/api";
+import { useTheme } from "@/components/ThemeProvider";
 
 const ExpensesPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { theme, setTheme } = useTheme();
   
   // Form state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -30,10 +32,15 @@ const ExpensesPage = () => {
   const [status, setStatus] = useState<"paid" | "pending">("pending");
   const [date, setDate] = useState<Date | undefined>(new Date());
 
-  // Fetch expenses
+  // Fetch expenses and dashboard data
   const { data: expenses = [] } = useQuery({
     queryKey: ['expenses'],
     queryFn: expenseAPI.getAll,
+  });
+
+  const { data: dashboardData } = useQuery({
+    queryKey: ['expenses', 'dashboard'],
+    queryFn: expenseAPI.getDashboard,
   });
 
   // Mutations
@@ -77,20 +84,6 @@ const ExpensesPage = () => {
       });
     },
   });
-
-  // Calculate totals
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const thisMonthExpenses = expenses
-    .filter(expense => {
-      const expenseDate = new Date(expense.date);
-      const now = new Date();
-      return expenseDate.getMonth() === now.getMonth() && 
-             expenseDate.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, expense) => sum + expense.amount, 0);
-  const pendingExpenses = expenses
-    .filter(expense => expense.status === 'pending')
-    .reduce((sum, expense) => sum + expense.amount, 0);
 
   // Reset form
   const resetForm = () => {
@@ -145,212 +138,290 @@ const ExpensesPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Expense Management</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2" onClick={resetForm}>
-              <Plus className="h-4 w-4" />
-              Add Expense
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Expense Management & Analytics</h1>
+            <p className="text-slate-600 dark:text-slate-300 mt-1">Track expenses and financial overview</p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="border-slate-300 dark:border-slate-600"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingExpense ? "Edit Expense" : "Add New Expense"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter expense description"
-                  rows={3}
-                />
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700" onClick={resetForm}>
+                  <Plus className="h-4 w-4" />
+                  Add Expense
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-white dark:bg-slate-800">
+                <DialogHeader>
+                  <DialogTitle className="text-slate-900 dark:text-white">
+                    {editingExpense ? "Edit Expense" : "Add New Expense"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="description" className="text-slate-700 dark:text-slate-300">Description *</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Enter expense description"
+                      rows={3}
+                      className="border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="amount" className="text-slate-700 dark:text-slate-300">Amount *</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="border-slate-300 dark:border-slate-600"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="category" className="text-slate-700 dark:text-slate-300">Category *</Label>
+                      <Select value={category} onValueChange={setCategory}>
+                        <SelectTrigger className="border-slate-300 dark:border-slate-600">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Fixed">Fixed</SelectItem>
+                          <SelectItem value="Variable">Variable</SelectItem>
+                          <SelectItem value="Capital">Capital</SelectItem>
+                          <SelectItem value="Operational">Operational</SelectItem>
+                          <SelectItem value="Employee Salary">Employee Salary</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="status" className="text-slate-700 dark:text-slate-300">Status *</Label>
+                      <Select value={status} onValueChange={(value: "paid" | "pending") => setStatus(value)}>
+                        <SelectTrigger className="border-slate-300 dark:border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-slate-700 dark:text-slate-300">Date *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal border-slate-300 dark:border-slate-600",
+                              !date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {date ? format(date, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            disabled={(date) => date > new Date()}
+                            initialFocus
+                            className="p-3 pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    disabled={createExpenseMutation.isPending || updateExpenseMutation.isPending}
+                  >
+                    {createExpenseMutation.isPending || updateExpenseMutation.isPending 
+                      ? "Saving..." 
+                      : editingExpense ? "Update Expense" : "Add Expense"
+                    }
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Enhanced Dashboard Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="border-0 shadow-lg bg-gradient-to-r from-red-500 to-red-600 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-red-100">Total Expenses</p>
+                  <p className="text-2xl font-bold">₹{dashboardData?.total_expenses?.toLocaleString() || 0}</p>
+                </div>
+                <CreditCard className="h-8 w-8 text-red-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg bg-gradient-to-r from-green-500 to-green-600 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100">Net Fine Balance</p>
+                  <p className="text-2xl font-bold">{dashboardData?.net_fine?.toFixed(4) || 0}g</p>
+                  <p className="text-xs text-green-200">Credit Fine - Debit Weight×Tunch</p>
+                </div>
+                <Scale className="h-8 w-8 text-green-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100">Total Bill Amount</p>
+                  <p className="text-2xl font-bold">₹{dashboardData?.total_bill_amount?.toLocaleString() || 0}</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-blue-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100">Total Silver Amount</p>
+                  <p className="text-2xl font-bold">₹{dashboardData?.total_silver_amount?.toLocaleString() || 0}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-purple-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100">Total Wages×Weight</p>
+                  <p className="text-2xl font-bold">₹{dashboardData?.total_wages_weight?.toLocaleString() || 0}</p>
+                </div>
+                <Scale className="h-8 w-8 text-orange-200" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Balance Sheet */}
+        <Card className="border-0 shadow-lg bg-white dark:bg-slate-800">
+          <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-t-lg">
+            <CardTitle className="text-xl">Balance Sheet</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-6 rounded-lg border border-green-200 dark:border-green-800">
+                <h3 className="text-lg font-semibold text-green-800 dark:text-green-300 mb-2">Silver Balance</h3>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                  {dashboardData?.balance_sheet?.silver_balance?.toFixed(4) || '0.0000'} grams
+                </p>
+                <p className="text-sm text-green-700 dark:text-green-500 mt-2">Net silver in stock</p>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="amount">Amount *</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category">Category *</Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Fixed">Fixed</SelectItem>
-                      <SelectItem value="Variable">Variable</SelectItem>
-                      <SelectItem value="Capital">Capital</SelectItem>
-                      <SelectItem value="Operational">Operational</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-2">Rupee Balance</h3>
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  ₹{dashboardData?.balance_sheet?.rupee_balance?.toLocaleString() || 0}
+                </p>
+                <p className="text-sm text-blue-700 dark:text-blue-500 mt-2">Revenue - Expenses</p>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="status">Status *</Label>
-                  <Select value={status} onValueChange={(value: "paid" | "pending") => setStatus(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="paid">Paid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Date *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? format(date, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        disabled={(date) => date > new Date()}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={createExpenseMutation.isPending || updateExpenseMutation.isPending}
-              >
-                {createExpenseMutation.isPending || updateExpenseMutation.isPending 
-                  ? "Saving..." 
-                  : editingExpense ? "Update Expense" : "Add Expense"
-                }
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Expenses</p>
-                <p className="text-2xl font-bold">₹{totalExpenses.toLocaleString()}</p>
-              </div>
-              <CreditCard className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">This Month</p>
-                <p className="text-2xl font-bold">₹{thisMonthExpenses.toLocaleString()}</p>
-              </div>
-              <CalendarIcon className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Pending</p>
-                <p className="text-2xl font-bold">₹{pendingExpenses.toLocaleString()}</p>
-              </div>
-              <CreditCard className="h-8 w-8 text-orange-600" />
+        {/* Recent Expenses */}
+        <Card className="border-0 shadow-lg bg-white dark:bg-slate-800">
+          <CardHeader className="bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600 rounded-t-lg">
+            <CardTitle className="text-lg font-semibold text-slate-800 dark:text-slate-200">Recent Expenses Log</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Description</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Amount</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Category</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map((expense) => (
+                    <tr key={expense.id} className="border-b border-slate-100 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700">
+                      <td className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{expense.description}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">₹{expense.amount.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{expense.category}</td>
+                      <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{format(new Date(expense.date), 'dd/MM/yyyy')}</td>
+                      <td className="py-3 px-4">
+                        <Badge 
+                          variant={expense.status === 'paid' ? 'default' : 'secondary'}
+                          className={expense.status === 'paid' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                            : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                          }
+                        >
+                          {expense.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEdit(expense)}
+                          className="flex items-center gap-1 border-slate-300 dark:border-slate-600"
+                        >
+                          <Edit className="h-3 w-3" />
+                          Edit
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {expenses.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        No expenses found. Add your first expense to get started.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Expenses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4">Description</th>
-                  <th className="text-left py-3 px-4">Amount</th>
-                  <th className="text-left py-3 px-4">Category</th>
-                  <th className="text-left py-3 px-4">Date</th>
-                  <th className="text-left py-3 px-4">Status</th>
-                  <th className="text-left py-3 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((expense) => (
-                  <tr key={expense.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium">{expense.description}</td>
-                    <td className="py-3 px-4 font-semibold">₹{expense.amount.toLocaleString()}</td>
-                    <td className="py-3 px-4">{expense.category}</td>
-                    <td className="py-3 px-4">{format(new Date(expense.date), 'dd/MM/yyyy')}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant={expense.status === 'paid' ? 'default' : 'secondary'}>
-                        {expense.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleEdit(expense)}
-                        className="flex items-center gap-1"
-                      >
-                        <Edit className="h-3 w-3" />
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {expenses.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500">
-                      No expenses found. Add your first expense to get started.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

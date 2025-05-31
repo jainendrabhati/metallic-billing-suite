@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 import os
-from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, Stock
+from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, Stock, StockItem
 from utils import export_to_csv, export_to_pdf, backup_database, restore_database
 
 app = Flask(__name__)
@@ -78,10 +78,10 @@ def create_bill():
     tunch = float(data['tunch'])
     wastage = float(data['wastage'])
     wages = float(data['wages'])
-    rupees = float(data.get('rupees', 0))
+    silver_amount = float(data.get('silver_amount', 0))
     
     total_fine = weight * ((tunch - wastage) / 100)
-    total_amount = (weight * (wages / 1000)) + rupees
+    total_amount = (weight * (wages / 1000)) + silver_amount
     
     bill = Bill.create(
         customer_id=data['customer_id'],
@@ -90,7 +90,7 @@ def create_bill():
         tunch=tunch,
         wages=wages,
         wastage=wastage,
-        rupees=rupees,
+        silver_amount=silver_amount,
         total_fine=total_fine,
         total_amount=total_amount,
         payment_type=data['payment_type'],
@@ -102,9 +102,9 @@ def create_bill():
     
     # Update stock based on payment type and item type
     if data['payment_type'] == 'credit':
-        Stock.add_stock(total_fine, f"Credit bill #{bill.id} - {data['item']}")
+        Stock.add_stock(data['item'], total_fine, f"Credit bill #{bill.id} - {data['item']}")
     else:  # debit
-        Stock.deduct_stock(total_fine, f"Debit bill #{bill.id} - {data['item']}")
+        Stock.deduct_stock(data['item'], total_fine, f"Debit bill #{bill.id} - {data['item']}")
     
     # Create transaction
     Transaction.create(
@@ -222,11 +222,51 @@ def create_employee_payment():
     
     return jsonify(payment.to_dict()), 201
 
-# Expense APIs
+# Enhanced Expense APIs with calculations
 @app.route('/api/expenses', methods=['GET'])
 def get_expenses():
     expenses = Expense.get_all()
     return jsonify([expense.to_dict() for expense in expenses])
+
+@app.route('/api/expenses/dashboard', methods=['GET'])
+def get_expense_dashboard():
+    all_bills = Bill.get_all()
+    all_expenses = Expense.get_all()
+    
+    # Calculate total expenses
+    total_expenses = sum(expense.amount for expense in all_expenses)
+    
+    # Calculate credit bills total fine
+    credit_bills = [bill for bill in all_bills if bill.payment_type == 'credit']
+    total_credit_fine = sum(bill.total_fine for bill in credit_bills)
+    
+    # Calculate debit bills weight * tunch
+    debit_bills = [bill for bill in all_bills if bill.payment_type == 'debit']
+    total_debit_weight_tunch = sum(bill.weight * bill.tunch for bill in debit_bills)
+    
+    # Net fine (credit fine - debit weight*tunch)
+    net_fine = total_credit_fine - total_debit_weight_tunch
+    
+    # Total amount of all bills
+    total_bill_amount = sum(bill.total_amount for bill in all_bills)
+    
+    # Total silver amount
+    total_silver_amount = sum(bill.silver_amount for bill in all_bills)
+    
+    # Total wages * weight
+    total_wages_weight = sum(bill.wages * bill.weight for bill in all_bills)
+    
+    return jsonify({
+        'total_expenses': total_expenses,
+        'net_fine': net_fine,
+        'total_bill_amount': total_bill_amount,
+        'total_silver_amount': total_silver_amount,
+        'total_wages_weight': total_wages_weight,
+        'balance_sheet': {
+            'silver_balance': net_fine,
+            'rupee_balance': total_bill_amount - total_expenses
+        }
+    })
 
 @app.route('/api/expenses', methods=['POST'])
 def create_expense():
@@ -248,48 +288,64 @@ def update_expense(expense_id):
         return jsonify(expense.to_dict())
     return jsonify({'error': 'Expense not found'}), 404
 
+# Stock Item APIs
+@app.route('/api/stock-items', methods=['GET'])
+def get_stock_items():
+    items = StockItem.get_all()
+    return jsonify([item.to_dict() for item in items])
+
+@app.route('/api/stock-items', methods=['POST'])
+def create_stock_item():
+    data = request.json
+    item = StockItem.create(
+        item_name=data['item_name'],
+        current_weight=float(data.get('current_weight', 0)),
+        description=data.get('description', '')
+    )
+    return jsonify(item.to_dict()), 201
+
+@app.route('/api/stock-items/<int:item_id>', methods=['PUT'])
+def update_stock_item(item_id):
+    data = request.json
+    item = StockItem.get_by_id(item_id)
+    if item:
+        item.item_name = data.get('item_name', item.item_name)
+        item.current_weight = float(data.get('current_weight', item.current_weight))
+        item.description = data.get('description', item.description)
+        item.updated_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify(item.to_dict())
+    return jsonify({'error': 'Stock item not found'}), 404
+
+@app.route('/api/stock-items/<int:item_id>', methods=['DELETE'])
+def delete_stock_item(item_id):
+    item = StockItem.get_by_id(item_id)
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'message': 'Stock item deleted successfully'})
+    return jsonify({'error': 'Stock item not found'}), 404
+
 # Stock APIs
 @app.route('/api/stock', methods=['GET'])
 def get_stock():
     stock = Stock.get_current_stock()
     return jsonify({'current_stock': stock})
 
-@app.route('/api/stock', methods=['POST'])
-def add_stock():
-    data = request.json
-    amount = float(data['amount'])
-    Stock.add_stock(amount)
-    return jsonify({'message': 'Stock added successfully', 'new_stock': Stock.get_current_stock()})
-
 @app.route('/api/stock/transaction', methods=['POST'])
 def add_stock_transaction():
     data = request.json
     amount = float(data['amount'])
     transaction_type = data['transaction_type']
+    item_name = data.get('item_name', 'General')
     description = data.get('description', f'Manual {transaction_type}')
     
     if transaction_type == 'add':
-        Stock.add_stock(amount, description)
+        Stock.add_stock(item_name, amount, description)
     else:
-        Stock.deduct_stock(amount, description)
+        Stock.deduct_stock(item_name, amount, description)
     
     return jsonify({'message': 'Stock transaction completed successfully', 'new_stock': Stock.get_current_stock()})
-
-@app.route('/api/stock/update', methods=['PUT'])
-def update_stock():
-    data = request.json
-    new_amount = float(data['amount'])
-    description = data.get('description', 'Stock adjustment')
-    
-    current_stock = Stock.get_current_stock()
-    difference = new_amount - current_stock
-    
-    if difference > 0:
-        Stock.add_stock(difference, f"Stock adjustment (increase): {description}")
-    elif difference < 0:
-        Stock.deduct_stock(abs(difference), f"Stock adjustment (decrease): {description}")
-    
-    return jsonify({'message': 'Stock updated successfully', 'new_stock': Stock.get_current_stock()})
 
 @app.route('/api/stock/history', methods=['GET'])
 def get_stock_history():
