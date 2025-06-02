@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, Plus, TrendingUp, TrendingDown, Edit, Moon, Sun, Trash2 } from "lucide-react";
+import { Package, Plus, TrendingUp, TrendingDown, Edit, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stockAPI, stockItemAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { useTheme } from "@/components/ThemeProvider";
 
 const StockPage = () => {
   const [itemName, setItemName] = useState("");
@@ -32,7 +30,6 @@ const StockPage = () => {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { theme, setTheme } = useTheme();
 
   const { data: stockItems = [] } = useQuery({
     queryKey: ['stock-items'],
@@ -178,22 +175,14 @@ const StockPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Stock Management System</h1>
-            <p className="text-slate-600 dark:text-slate-300 mt-1">Manage inventory items and track stock movements</p>
+            <h1 className="text-3xl font-bold text-slate-900">Stock Management System</h1>
+            <p className="text-slate-600 mt-1">Manage inventory items and track stock movements</p>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="border-slate-300 dark:border-slate-600"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
         </div>
 
         {/* Quick Actions */}
@@ -205,23 +194,23 @@ const StockPage = () => {
                 Add New Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white dark:bg-slate-800">
+            <DialogContent className="bg-white">
               <DialogHeader>
-                <DialogTitle className="text-slate-900 dark:text-white">Add New Stock Item</DialogTitle>
+                <DialogTitle className="text-slate-900">Add New Stock Item</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateItem} className="space-y-4">
                 <div>
-                  <Label htmlFor="itemName" className="text-slate-700 dark:text-slate-300">Item Name *</Label>
+                  <Label htmlFor="itemName" className="text-slate-700">Item Name *</Label>
                   <Input
                     id="itemName"
                     value={itemName}
                     onChange={(e) => setItemName(e.target.value)}
                     placeholder="Enter item name"
-                    className="border-slate-300 dark:border-slate-600"
+                    className="border-slate-300"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="currentWeight" className="text-slate-700 dark:text-slate-300">Initial Weight (grams) *</Label>
+                  <Label htmlFor="currentWeight" className="text-slate-700">Initial Weight (grams) *</Label>
                   <Input
                     id="currentWeight"
                     type="number"
@@ -229,17 +218,17 @@ const StockPage = () => {
                     value={currentWeight}
                     onChange={(e) => setCurrentWeight(e.target.value)}
                     placeholder="Enter initial weight"
-                    className="border-slate-300 dark:border-slate-600"
+                    className="border-slate-300"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="description" className="text-slate-700 dark:text-slate-300">Description</Label>
+                  <Label htmlFor="description" className="text-slate-700">Description</Label>
                   <Textarea
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Enter description (optional)"
-                    className="border-slate-300 dark:border-slate-600"
+                    className="border-slate-300"
                   />
                 </div>
                 <Button 
@@ -255,20 +244,20 @@ const StockPage = () => {
 
           <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-slate-300 dark:border-slate-600">
+              <Button variant="outline" className="border-slate-300">
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Add Transaction
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white dark:bg-slate-800">
+            <DialogContent className="bg-white">
               <DialogHeader>
-                <DialogTitle className="text-slate-900 dark:text-white">Stock Transaction</DialogTitle>
+                <DialogTitle className="text-slate-900">Stock Transaction</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleTransaction} className="space-y-4">
                 <div>
-                  <Label htmlFor="selectedItem" className="text-slate-700 dark:text-slate-300">Select Item *</Label>
+                  <Label htmlFor="selectedItem" className="text-slate-700">Select Item *</Label>
                   <Select value={selectedItem} onValueChange={setSelectedItem}>
-                    <SelectTrigger className="border-slate-300 dark:border-slate-600">
+                    <SelectTrigger className="border-slate-300">
                       <SelectValue placeholder="Select an item" />
                     </SelectTrigger>
                     <SelectContent>
@@ -281,9 +270,9 @@ const StockPage = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="transactionType" className="text-slate-700 dark:text-slate-300">Transaction Type</Label>
+                  <Label htmlFor="transactionType" className="text-slate-700">Transaction Type</Label>
                   <Select value={transactionType} onValueChange={(value: "add" | "deduct") => setTransactionType(value)}>
-                    <SelectTrigger className="border-slate-300 dark:border-slate-600">
+                    <SelectTrigger className="border-slate-300">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -293,7 +282,7 @@ const StockPage = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="transactionAmount" className="text-slate-700 dark:text-slate-300">Amount (grams) *</Label>
+                  <Label htmlFor="transactionAmount" className="text-slate-700">Amount (grams) *</Label>
                   <Input
                     id="transactionAmount"
                     type="number"
@@ -301,17 +290,17 @@ const StockPage = () => {
                     value={transactionAmount}
                     onChange={(e) => setTransactionAmount(e.target.value)}
                     placeholder="Enter amount"
-                    className="border-slate-300 dark:border-slate-600"
+                    className="border-slate-300"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="transactionDescription" className="text-slate-700 dark:text-slate-300">Description</Label>
+                  <Label htmlFor="transactionDescription" className="text-slate-700">Description</Label>
                   <Textarea
                     id="transactionDescription"
                     value={transactionDescription}
                     onChange={(e) => setTransactionDescription(e.target.value)}
                     placeholder="Enter description (optional)"
-                    className="border-slate-300 dark:border-slate-600"
+                    className="border-slate-300"
                   />
                 </div>
                 <Button 
@@ -327,7 +316,7 @@ const StockPage = () => {
         </div>
 
         {/* Stock Items Table */}
-        <Card className="border-0 shadow-lg bg-white dark:bg-slate-800">
+        <Card className="border-0 shadow-lg bg-white">
           <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
               <Package className="h-6 w-6" />
@@ -338,24 +327,24 @@ const StockPage = () => {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-700">
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Item Name</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Current Weight (grams)</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Description</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Last Updated</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Actions</TableHead>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="font-semibold text-slate-700">Item Name</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Current Weight (grams)</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Description</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Last Updated</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {stockItems.map((item) => (
                     <TableRow 
                       key={item.id} 
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-600"
+                      className="hover:bg-slate-50 border-b border-slate-100"
                     >
-                      <TableCell className="font-medium text-slate-900 dark:text-slate-100">{item.item_name}</TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300">{item.current_weight.toFixed(4)}</TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300">{item.description}</TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300">
+                      <TableCell className="font-medium text-slate-900">{item.item_name}</TableCell>
+                      <TableCell className="text-slate-700">{item.current_weight.toFixed(4)}</TableCell>
+                      <TableCell className="text-slate-700">{item.description}</TableCell>
+                      <TableCell className="text-slate-700">
                         {format(new Date(item.updated_at), 'dd/MM/yyyy HH:mm')}
                       </TableCell>
                       <TableCell>
@@ -364,7 +353,7 @@ const StockPage = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditItem(item)}
-                            className="border-slate-300 dark:border-slate-600"
+                            className="border-slate-300"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -384,9 +373,9 @@ const StockPage = () => {
               </Table>
               {stockItems.length === 0 && (
                 <div className="text-center py-12">
-                  <Package className="h-16 w-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No stock items found</h3>
-                  <p className="text-slate-500 dark:text-slate-400">Add your first stock item to get started</p>
+                  <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">No stock items found</h3>
+                  <p className="text-slate-500">Add your first stock item to get started</p>
                 </div>
               )}
             </div>
@@ -395,23 +384,23 @@ const StockPage = () => {
 
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="bg-white dark:bg-slate-800">
+          <DialogContent className="bg-white">
             <DialogHeader>
-              <DialogTitle className="text-slate-900 dark:text-white">Edit Stock Item</DialogTitle>
+              <DialogTitle className="text-slate-900">Edit Stock Item</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleUpdateItem} className="space-y-4">
               <div>
-                <Label htmlFor="editItemName" className="text-slate-700 dark:text-slate-300">Item Name *</Label>
+                <Label htmlFor="editItemName" className="text-slate-700">Item Name *</Label>
                 <Input
                   id="editItemName"
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
                   placeholder="Enter item name"
-                  className="border-slate-300 dark:border-slate-600"
+                  className="border-slate-300"
                 />
               </div>
               <div>
-                <Label htmlFor="editCurrentWeight" className="text-slate-700 dark:text-slate-300">Current Weight (grams) *</Label>
+                <Label htmlFor="editCurrentWeight" className="text-slate-700">Current Weight (grams) *</Label>
                 <Input
                   id="editCurrentWeight"
                   type="number"
@@ -419,17 +408,17 @@ const StockPage = () => {
                   value={currentWeight}
                   onChange={(e) => setCurrentWeight(e.target.value)}
                   placeholder="Enter current weight"
-                  className="border-slate-300 dark:border-slate-600"
+                  className="border-slate-300"
                 />
               </div>
               <div>
-                <Label htmlFor="editDescription" className="text-slate-700 dark:text-slate-300">Description</Label>
+                <Label htmlFor="editDescription" className="text-slate-700">Description</Label>
                 <Textarea
                   id="editDescription"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Enter description (optional)"
-                  className="border-slate-300 dark:border-slate-600"
+                  className="border-slate-300"
                 />
               </div>
               <Button 
@@ -444,32 +433,32 @@ const StockPage = () => {
         </Dialog>
 
         {/* Transaction History */}
-        <Card className="border-0 shadow-lg bg-white dark:bg-slate-800">
-          <CardHeader className="bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600 rounded-t-lg">
-            <CardTitle className="text-lg font-semibold text-slate-800 dark:text-slate-200">Transaction History</CardTitle>
+        <Card className="border-0 shadow-lg bg-white">
+          <CardHeader className="bg-slate-50 border-b border-slate-200 rounded-t-lg">
+            <CardTitle className="text-lg font-semibold text-slate-800">Transaction History</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-700">
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Date & Time</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Item</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Type</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Amount (grams)</TableHead>
-                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Description</TableHead>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="font-semibold text-slate-700">Date & Time</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Item</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Type</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Amount (grams)</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Description</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {stockHistory.map((stock) => (
                     <TableRow 
                       key={stock.id} 
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-600"
+                      className="hover:bg-slate-50 border-b border-slate-100"
                     >
-                      <TableCell className="text-slate-700 dark:text-slate-300">
+                      <TableCell className="text-slate-700">
                         {format(new Date(stock.created_at), 'dd/MM/yyyy HH:mm')}
                       </TableCell>
-                      <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                      <TableCell className="font-medium text-slate-900">
                         {stock.item_name}
                       </TableCell>
                       <TableCell>
@@ -477,8 +466,8 @@ const StockPage = () => {
                           variant={stock.transaction_type === 'add' ? 'default' : 'secondary'}
                           className={`flex items-center gap-1 w-fit ${
                             stock.transaction_type === 'add' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
                           }`}
                         >
                           {stock.transaction_type === 'add' ? (
@@ -489,19 +478,19 @@ const StockPage = () => {
                           {stock.transaction_type.toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+                      <TableCell className="font-medium text-slate-900">
                         {stock.amount.toFixed(4)}
                       </TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300">{stock.description}</TableCell>
+                      <TableCell className="text-slate-700">{stock.description}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
               {stockHistory.length === 0 && (
                 <div className="text-center py-12">
-                  <Package className="h-16 w-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No transactions found</h3>
-                  <p className="text-slate-500 dark:text-slate-400">Stock transactions will appear here</p>
+                  <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">No transactions found</h3>
+                  <p className="text-slate-500">Stock transactions will appear here</p>
                 </div>
               )}
             </div>
