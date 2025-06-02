@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CalendarIcon, Download, FileText, Search, Eye } from "lucide-react";
+import { CalendarIcon, Download, FileText, Search, Eye, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -64,6 +65,44 @@ const TransactionsPage = () => {
       });
     } catch (error) {
       console.error('Error exporting PDF:', error);
+    }
+  };
+
+  const handlePrintTransaction = (transaction: any) => {
+    const printContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+        <h2 style="text-align: center; margin-bottom: 30px;">Transaction Details</h2>
+        <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <strong>Bill Number:</strong> ${transaction.bill_number || 'N/A'}<br>
+              <strong>Customer:</strong> ${transaction.customer_name}<br>
+              <strong>Type:</strong> ${transaction.transaction_type.toUpperCase()}<br>
+              <strong>Amount:</strong> ₹${transaction.amount.toLocaleString()}
+            </div>
+            <div>
+              <strong>Weight:</strong> ${transaction.weight || 'N/A'} gm<br>
+              <strong>Tunch:</strong> ${transaction.tunch || 'N/A'}%<br>
+              <strong>Wages:</strong> ₹${transaction.wages || 'N/A'}<br>
+              <strong>Wastage:</strong> ${transaction.wastage || 'N/A'}%
+            </div>
+          </div>
+          ${transaction.silver_amount ? `<div><strong>Silver Amount:</strong> ₹${transaction.silver_amount.toLocaleString()}</div>` : ''}
+          <div style="margin-top: 20px;">
+            <strong>Description:</strong> ${transaction.description}
+          </div>
+          <div style="margin-top: 20px; text-align: right;">
+            <strong>Date:</strong> ${format(new Date(transaction.created_at), 'dd/MM/yyyy HH:mm')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
     }
   };
 
@@ -189,20 +228,16 @@ const TransactionsPage = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold text-gray-700">Transaction ID</TableHead>
                       <TableHead className="font-semibold text-gray-700">Bill Number</TableHead>
                       <TableHead className="font-semibold text-gray-700">Customer</TableHead>
                       <TableHead className="font-semibold text-gray-700">Amount</TableHead>
                       <TableHead className="font-semibold text-gray-700">Type</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Date</TableHead>
                       <TableHead className="font-semibold text-gray-700">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((transaction) => (
                       <TableRow key={transaction.id} className="hover:bg-gray-50 border-b border-gray-100">
-                        <TableCell className="font-medium text-gray-900">TXN-{transaction.id.toString().padStart(4, '0')}</TableCell>
                         <TableCell className="text-gray-700">{transaction.bill_number || 'N/A'}</TableCell>
                         <TableCell className="text-gray-700 font-medium">{transaction.customer_name}</TableCell>
                         <TableCell className="font-bold text-blue-600">₹{transaction.amount.toLocaleString()}</TableCell>
@@ -213,113 +248,130 @@ const TransactionsPage = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={transaction.status === 'completed' ? 'default' : 'secondary'}
-                            className={transaction.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
-                          >
-                            {transaction.status.toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-gray-700">{format(new Date(transaction.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
-                        <TableCell>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="border-gray-300 hover:bg-gray-50"
-                                onClick={() => setSelectedTransactionId(transaction.id)}
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                View Details
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle className="text-2xl font-bold text-gray-900">
-                                  Transaction Details - TXN-{transaction.id.toString().padStart(4, '0')}
-                                </DialogTitle>
-                              </DialogHeader>
-                              {selectedTransaction && (
-                                <div className="space-y-6">
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <Card>
-                                      <CardHeader>
-                                        <CardTitle className="text-lg">Transaction Information</CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="space-y-3">
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Transaction ID</label>
-                                          <p className="text-gray-900 font-semibold">TXN-{selectedTransaction.id.toString().padStart(4, '0')}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Bill Number</label>
-                                          <p className="text-gray-900">{selectedTransaction.bill_number || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Customer Name</label>
-                                          <p className="text-gray-900 font-medium">{selectedTransaction.customer_name}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Transaction Type</label>
+                          <div className="flex gap-2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-gray-300 hover:bg-gray-50"
+                                  onClick={() => setSelectedTransactionId(transaction.id)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle className="text-2xl font-bold text-gray-900 flex items-center justify-between">
+                                    Transaction Details - {transaction.bill_number || 'N/A'}
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => handlePrintTransaction(transaction)}
+                                      className="ml-4"
+                                    >
+                                      <Printer className="h-4 w-4 mr-1" />
+                                      Print
+                                    </Button>
+                                  </DialogTitle>
+                                </DialogHeader>
+                                {selectedTransaction && (
+                                  <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      <Card>
+                                        <CardHeader>
+                                          <CardTitle className="text-lg">Transaction Information</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
                                           <div>
-                                            <Badge 
-                                              variant={selectedTransaction.transaction_type === 'credit' ? 'default' : 'secondary'}
-                                              className={selectedTransaction.transaction_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
-                                            >
-                                              {selectedTransaction.transaction_type.toUpperCase()}
-                                            </Badge>
+                                            <label className="text-sm font-medium text-gray-600">Bill Number</label>
+                                            <p className="text-gray-900">{selectedTransaction.bill_number || 'N/A'}</p>
                                           </div>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
+                                          <div>
+                                            <label className="text-sm font-medium text-gray-600">Customer Name</label>
+                                            <p className="text-gray-900 font-medium">{selectedTransaction.customer_name}</p>
+                                          </div>
+                                          <div>
+                                            <label className="text-sm font-medium text-gray-600">Transaction Type</label>
+                                            <div>
+                                              <Badge 
+                                                variant={selectedTransaction.transaction_type === 'credit' ? 'default' : 'secondary'}
+                                                className={selectedTransaction.transaction_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                                              >
+                                                {selectedTransaction.transaction_type.toUpperCase()}
+                                              </Badge>
+                                            </div>
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                      
+                                      <Card>
+                                        <CardHeader>
+                                          <CardTitle className="text-lg">Financial Details</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                          <div>
+                                            <label className="text-sm font-medium text-gray-600">Amount</label>
+                                            <p className="text-2xl font-bold text-blue-600">₹{selectedTransaction.amount.toLocaleString()}</p>
+                                          </div>
+                                          {selectedTransaction.weight && (
+                                            <div>
+                                              <label className="text-sm font-medium text-gray-600">Weight</label>
+                                              <p className="text-gray-900">{selectedTransaction.weight} gm</p>
+                                            </div>
+                                          )}
+                                          {selectedTransaction.tunch && (
+                                            <div>
+                                              <label className="text-sm font-medium text-gray-600">Tunch</label>
+                                              <p className="text-gray-900">{selectedTransaction.tunch}%</p>
+                                            </div>
+                                          )}
+                                          {selectedTransaction.wages && (
+                                            <div>
+                                              <label className="text-sm font-medium text-gray-600">Wages</label>
+                                              <p className="text-gray-900">₹{selectedTransaction.wages}</p>
+                                            </div>
+                                          )}
+                                          {selectedTransaction.wastage && (
+                                            <div>
+                                              <label className="text-sm font-medium text-gray-600">Wastage</label>
+                                              <p className="text-gray-900">{selectedTransaction.wastage}%</p>
+                                            </div>
+                                          )}
+                                          {selectedTransaction.silver_amount && (
+                                            <div>
+                                              <label className="text-sm font-medium text-gray-600">Silver Amount</label>
+                                              <p className="text-gray-900">₹{selectedTransaction.silver_amount.toLocaleString()}</p>
+                                            </div>
+                                          )}
+                                        </CardContent>
+                                      </Card>
+                                    </div>
                                     
-                                    <Card>
-                                      <CardHeader>
-                                        <CardTitle className="text-lg">Financial Details</CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="space-y-3">
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Amount</label>
-                                          <p className="text-2xl font-bold text-blue-600">₹{selectedTransaction.amount.toLocaleString()}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Status</label>
-                                          <div>
-                                            <Badge 
-                                              variant={selectedTransaction.status === 'completed' ? 'default' : 'secondary'}
-                                              className={selectedTransaction.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
-                                            >
-                                              {selectedTransaction.status.toUpperCase()}
-                                            </Badge>
-                                          </div>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Created At</label>
-                                          <p className="text-gray-900">{format(new Date(selectedTransaction.created_at), 'dd MMM yyyy HH:mm:ss')}</p>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Last Updated</label>
-                                          <p className="text-gray-900">{format(new Date(selectedTransaction.updated_at), 'dd MMM yyyy HH:mm:ss')}</p>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
+                                    {selectedTransaction.description && (
+                                      <Card>
+                                        <CardHeader>
+                                          <CardTitle className="text-lg">Description</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                          <p className="text-gray-900">{selectedTransaction.description}</p>
+                                        </CardContent>
+                                      </Card>
+                                    )}
                                   </div>
-                                  
-                                  {selectedTransaction.description && (
-                                    <Card>
-                                      <CardHeader>
-                                        <CardTitle className="text-lg">Description</CardTitle>
-                                      </CardHeader>
-                                      <CardContent>
-                                        <p className="text-gray-900">{selectedTransaction.description}</p>
-                                      </CardContent>
-                                    </Card>
-                                  )}
-                                </div>
-                              )}
-                            </DialogContent>
-                          </Dialog>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handlePrintTransaction(transaction)}
+                              className="border-gray-300 hover:bg-gray-50"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
