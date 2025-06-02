@@ -27,7 +27,7 @@ const EmployeesPage = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [nameFilter, setNameFilter] = useState("");
-  const [positionFilter, setPositionFilter] = useState("");
+  const [positionFilter, setPositionFilter] = useState("all");
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -45,7 +45,7 @@ const EmployeesPage = () => {
 
   const filteredEmployees = employees.filter(employee => 
     employee.name.toLowerCase().includes(nameFilter.toLowerCase()) &&
-    (positionFilter === "" || employee.position.toLowerCase().includes(positionFilter.toLowerCase()))
+    (positionFilter === "all" || employee.position.toLowerCase().includes(positionFilter.toLowerCase()))
   );
 
   const uniqueEmployeeNames = [...new Set(employees.map(emp => emp.name))];
@@ -341,7 +341,7 @@ const EmployeesPage = () => {
                     <SelectValue placeholder="Filter by position" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Positions</SelectItem>
+                    <SelectItem value="all">All Positions</SelectItem>
                     {uniquePositions.map((position) => (
                       <SelectItem key={position} value={position}>{position}</SelectItem>
                     ))}
