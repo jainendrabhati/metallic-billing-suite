@@ -8,12 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Plus, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CalendarIcon, Plus, FileText, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { customerAPI, billAPI, Customer, Bill } from "@/services/api";
+import { customerAPI, billAPI, stockItemAPI, settingsAPI, Customer, Bill } from "@/services/api";
+import BillPrint from "@/components/BillPrint";
 
 const BillingPage = () => {
   const { toast } = useToast();
@@ -34,8 +36,9 @@ const BillingPage = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [paymentType, setPaymentType] = useState<"credit" | "debit">("credit");
   const [description, setDescription] = useState("");
-  const [gstNumber, setGstNumber] = useState("");
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [selectedBillForPrint, setSelectedBillForPrint] = useState<Bill | null>(null);
 
   // Calculated values
   const totalFine = weight && tunch && wastage ? 
@@ -52,6 +55,16 @@ const BillingPage = () => {
   const { data: bills = [] } = useQuery({
     queryKey: ['bills'],
     queryFn: billAPI.getAll,
+  });
+
+  const { data: stockItems = [] } = useQuery({
+    queryKey: ['stockItems'],
+    queryFn: stockItemAPI.getAll,
+  });
+
+  const { data: firmSettings } = useQuery({
+    queryKey: ['firmSettings'],
+    queryFn: settingsAPI.getFirmSettings,
   });
 
   // Search customers
@@ -71,13 +84,16 @@ const BillingPage = () => {
 
   const createBillMutation = useMutation({
     mutationFn: billAPI.create,
-    onSuccess: () => {
+    onSuccess: (newBill) => {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['stockItems'] });
       toast({
         title: "Success",
         description: "Bill created successfully!",
       });
+      setSelectedBillForPrint(newBill);
+      setShowPrintDialog(true);
       resetForm();
     },
     onError: (error) => {
@@ -127,7 +143,6 @@ const BillingPage = () => {
     setDate(new Date());
     setPaymentType("credit");
     setDescription("");
-    setGstNumber("");
     setShowCustomerSuggestions(false);
   };
 
@@ -178,7 +193,6 @@ const BillingPage = () => {
         payment_type: paymentType,
         slip_no: slipNo,
         description,
-        gst_number: gstNumber,
         date: format(date, "yyyy-MM-dd"),
       });
     }
@@ -267,13 +281,18 @@ const BillingPage = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
                         <Label htmlFor="item" className="text-sm">Item *</Label>
-                        <Input
-                          id="item"
-                          value={item}
-                          onChange={(e) => setItem(e.target.value)}
-                          placeholder="Enter item name"
-                          className="border-gray-300 focus:border-blue-500 text-sm"
-                        />
+                        <Select value={item} onValueChange={setItem}>
+                          <SelectTrigger className="border-gray-300 text-sm">
+                            <SelectValue placeholder="Select item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {stockItems.map((stockItem) => (
+                              <SelectItem key={stockItem.id} value={stockItem.item_name}>
+                                {stockItem.item_name} ({stockItem.current_weight.toFixed(4)}g)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="slipNo" className="text-sm">Slip Number</Label>
@@ -421,28 +440,16 @@ const BillingPage = () => {
                   {/* Additional Information */}
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <h3 className="text-base font-semibold text-gray-800 mb-3">Additional Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="description" className="text-sm">Description</Label>
-                        <Textarea
-                          id="description"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Enter description"
-                          rows={2}
-                          className="border-gray-300 focus:border-blue-500 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="gstNumber" className="text-sm">GST Number</Label>
-                        <Input
-                          id="gstNumber"
-                          value={gstNumber}
-                          onChange={(e) => setGstNumber(e.target.value)}
-                          placeholder="Enter GST number"
-                          className="border-gray-300 focus:border-blue-500 text-sm"
-                        />
-                      </div>
+                    <div>
+                      <Label htmlFor="description" className="text-sm">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Enter description"
+                        rows={2}
+                        className="border-gray-300 focus:border-blue-500 text-sm"
+                      />
                     </div>
                   </div>
 
@@ -473,7 +480,7 @@ const BillingPage = () => {
                     <div key={bill.id} className="p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                       <div className="flex justify-between items-start">
                         <div>
-                          <div className="font-bold text-gray-900 text-sm">Bill #{bill.id}</div>
+                          <div className="font-bold text-gray-900 text-sm">{bill.bill_number}</div>
                           <div className="text-xs text-gray-600 font-medium">{bill.customer_name}</div>
                           <div className="text-xs text-gray-500">{bill.item}</div>
                           {bill.slip_no && <div className="text-xs text-blue-600">Slip: {bill.slip_no}</div>}
@@ -481,11 +488,22 @@ const BillingPage = () => {
                         <div className="text-right">
                           <div className="font-bold text-green-600 text-sm">₹{bill.total_amount.toFixed(2)}</div>
                           <div className="text-xs text-gray-500">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
-                          <div className="text-xs">
+                          <div className="text-xs flex gap-1">
                             <Badge variant={bill.payment_type === 'credit' ? 'default' : 'secondary'} 
                                    className={`text-xs ${bill.payment_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                               {bill.payment_type.toUpperCase()}
                             </Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedBillForPrint(bill);
+                                setShowPrintDialog(true);
+                              }}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Printer className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -497,6 +515,18 @@ const BillingPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Print Dialog */}
+      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Print Bill</DialogTitle>
+          </DialogHeader>
+          {selectedBillForPrint && firmSettings && (
+            <BillPrint bill={selectedBillForPrint} firmSettings={firmSettings} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

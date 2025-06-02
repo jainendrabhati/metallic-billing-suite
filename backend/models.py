@@ -97,19 +97,19 @@ class Bill(db.Model):
     __tablename__ = 'bills'
     
     id = db.Column(db.Integer, primary_key=True)
+    bill_number = db.Column(db.String(20), unique=True, nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     item = db.Column(db.String(100), nullable=False)
     weight = db.Column(db.Float, nullable=False)
     tunch = db.Column(db.Float, nullable=False)
     wages = db.Column(db.Float, nullable=False)
     wastage = db.Column(db.Float, nullable=False)
-    silver_amount = db.Column(db.Float, default=0.0)  # renamed from rupees
+    silver_amount = db.Column(db.Float, default=0.0)
     total_fine = db.Column(db.Float, nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
     payment_type = db.Column(db.String(10), nullable=False)  # credit/debit
     slip_no = db.Column(db.String(50))
     description = db.Column(db.Text)
-    gst_number = db.Column(db.String(20))
     date = db.Column(db.Date, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -120,6 +120,7 @@ class Bill(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'bill_number': self.bill_number,
             'customer_id': self.customer_id,
             'customer_name': self.customer.name if self.customer else None,
             'item': self.item,
@@ -130,17 +131,34 @@ class Bill(db.Model):
             'silver_amount': self.silver_amount,
             'total_fine': self.total_fine,
             'total_amount': self.total_amount,
+            'total_wages': self.wages * self.weight,
             'payment_type': self.payment_type,
             'slip_no': self.slip_no,
             'description': self.description,
-            'gst_number': self.gst_number,
             'date': self.date.isoformat() if self.date else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
     @classmethod
+    def generate_bill_number(cls, date):
+        date_str = date.strftime('%Y%m%d')
+        last_bill = cls.query.filter(cls.bill_number.like(f'{date_str}%')).order_by(cls.bill_number.desc()).first()
+        
+        if last_bill:
+            last_number = int(last_bill.bill_number[-4:])
+            new_number = last_number + 1
+        else:
+            new_number = 1
+        
+        return f"{date_str}{new_number:04d}"
+
+    @classmethod
     def create(cls, **kwargs):
+        if 'date' in kwargs:
+            bill_date = datetime.strptime(kwargs['date'], '%Y-%m-%d').date() if isinstance(kwargs['date'], str) else kwargs['date']
+            kwargs['bill_number'] = cls.generate_bill_number(bill_date)
+        
         bill = cls(**kwargs)
         db.session.add(bill)
         db.session.commit()
@@ -172,24 +190,35 @@ class Transaction(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     transaction_type = db.Column(db.String(10), nullable=False)  # credit/debit
-    status = db.Column(db.String(10), nullable=False)  # completed/pending
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
+        bill_details = {}
+        if self.bill:
+            bill_details = {
+                'weight': self.bill.weight,
+                'tunch': self.bill.tunch,
+                'wages': self.bill.wages,
+                'wastage': self.bill.wastage,
+                'silver_amount': self.bill.silver_amount if self.bill.payment_type == 'credit' else 0,
+                'total_wages': self.bill.wages * self.bill.weight,
+                'item': self.bill.item
+            }
+        
         return {
             'id': self.id,
             'bill_id': self.bill_id,
-            'bill_number': f"BILL-{self.bill_id:04d}" if self.bill_id else None,
+            'bill_number': self.bill.bill_number if self.bill else None,
             'customer_id': self.customer_id,
             'customer_name': self.customer.name if self.customer else None,
             'amount': self.amount,
             'transaction_type': self.transaction_type,
-            'status': self.status,
             'description': self.description,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            **bill_details
         }
 
     @classmethod
@@ -228,7 +257,7 @@ class Employee(db.Model):
     __tablename__ = 'employees'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False, unique=True)
     position = db.Column(db.String(100), nullable=False)
     monthly_salary = db.Column(db.Float, nullable=False)
     present_days = db.Column(db.Integer, nullable=False)
@@ -313,7 +342,7 @@ class EmployeePayment(db.Model):
     payment_date = db.Column(db.Date, nullable=False)
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
         return {
@@ -530,3 +559,44 @@ class BillItem(db.Model):
         db.session.add(item)
         db.session.commit()
         return item
+
+class FirmSettings(db.Model):
+    __tablename__ = 'firm_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    firm_name = db.Column(db.String(200), default="Metalic Jewelers")
+    gst_number = db.Column(db.String(50), default="24ABCDE1234F1Z5")
+    address = db.Column(db.Text, default="123 Business Street, City, State - 400001")
+    logo_path = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'firm_name': self.firm_name,
+            'gst_number': self.gst_number,
+            'address': self.address,
+            'logo_path': self.logo_path,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def get_settings(cls):
+        settings = cls.query.first()
+        if not settings:
+            settings = cls()
+            db.session.add(settings)
+            db.session.commit()
+        return settings
+
+    @classmethod
+    def update_settings(cls, data):
+        settings = cls.get_settings()
+        for key, value in data.items():
+            if hasattr(settings, key):
+                setattr(settings, key, value)
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        return settings

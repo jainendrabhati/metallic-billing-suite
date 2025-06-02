@@ -14,6 +14,7 @@ export interface Customer {
 
 export interface Bill {
   id: number;
+  bill_number: string;
   customer_id: number;
   customer_name?: string;
   item: string;
@@ -21,13 +22,13 @@ export interface Bill {
   tunch: number;
   wages: number;
   wastage: number;
-  silver_amount: number; // renamed from rupees
+  silver_amount: number;
   total_fine: number;
   total_amount: number;
+  total_wages?: number;
   payment_type: 'credit' | 'debit';
   slip_no: string;
   description: string;
-  gst_number: string;
   date: string;
   created_at: string;
   updated_at: string;
@@ -62,10 +63,16 @@ export interface Transaction {
   customer_name?: string;
   amount: number;
   transaction_type: 'credit' | 'debit';
-  status: 'completed' | 'pending';
   description: string;
   created_at: string;
   updated_at: string;
+  weight?: number;
+  tunch?: number;
+  wages?: number;
+  wastage?: number;
+  silver_amount?: number;
+  total_wages?: number;
+  item?: string;
 }
 
 export interface Expense {
@@ -113,6 +120,16 @@ export interface Stock {
   created_at: string;
 }
 
+export interface FirmSettings {
+  id: number;
+  firm_name: string;
+  gst_number: string;
+  address: string;
+  logo_path?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Customer API
 export const customerAPI = {
   getAll: async (): Promise<Customer[]> => {
@@ -157,7 +174,7 @@ export const billAPI = {
     return response.json();
   },
   
-  create: async (bill: Omit<Bill, 'id' | 'customer_name' | 'total_fine' | 'total_amount' | 'created_at' | 'updated_at'>): Promise<Bill> => {
+  create: async (bill: Omit<Bill, 'id' | 'bill_number' | 'customer_name' | 'total_fine' | 'total_amount' | 'created_at' | 'updated_at'>): Promise<Bill> => {
     const response = await fetch(`${API_BASE_URL}/bills`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -314,12 +331,12 @@ export const settingsAPI = {
     return response.json();
   },
   
-  getFirmSettings: async () => {
+  getFirmSettings: async (): Promise<FirmSettings> => {
     const response = await fetch(`${API_BASE_URL}/settings/firm`);
     return response.json();
   },
   
-  updateFirmSettings: async (settings: any) => {
+  updateFirmSettings: async (settings: Partial<FirmSettings>): Promise<FirmSettings> => {
     const response = await fetch(`${API_BASE_URL}/settings/firm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
