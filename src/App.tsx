@@ -1,3 +1,4 @@
+
 import Index from "@/pages/Index";
 import Dashboard from "@/pages/Dashboard";
 import BillingPage from "@/pages/BillingPage";
@@ -28,7 +29,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="system">
         <Toaster />
         <Router>
           <SidebarProvider>

@@ -69,6 +69,7 @@ const TransactionsPage = () => {
   };
 
   const handlePrintTransaction = (transaction: any) => {
+    const totalWages = (transaction.wages || 0) * (transaction.weight || 0);
     const printContent = `
       <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
         <h2 style="text-align: center; margin-bottom: 30px;">Transaction Details</h2>
@@ -83,15 +84,16 @@ const TransactionsPage = () => {
             <div>
               <strong>Weight:</strong> ${transaction.weight || 'N/A'} gm<br>
               <strong>Tunch:</strong> ${transaction.tunch || 'N/A'}%<br>
-              <strong>Wages:</strong> ₹${transaction.wages || 'N/A'}<br>
+              <strong>Wages:</strong> ₹${transaction.wages || 'N/A'}/gm<br>
               <strong>Wastage:</strong> ${transaction.wastage || 'N/A'}%
             </div>
           </div>
-          ${transaction.silver_amount ? `<div><strong>Silver Amount:</strong> ₹${transaction.silver_amount.toLocaleString()}</div>` : ''}
-          <div style="margin-top: 20px;">
+          <div style="margin-bottom: 20px;">
+            <strong>Total Wages:</strong> ₹${totalWages.toFixed(2)}<br>
+            ${transaction.silver_amount ? `<strong>Silver Amount:</strong> ₹${transaction.silver_amount.toLocaleString()}<br>` : ''}
             <strong>Description:</strong> ${transaction.description}
           </div>
-          <div style="margin-top: 20px; text-align: right;">
+          <div style="text-align: right;">
             <strong>Date:</strong> ${format(new Date(transaction.created_at), 'dd/MM/yyyy HH:mm')}
           </div>
         </div>
@@ -308,13 +310,9 @@ const TransactionsPage = () => {
                                       
                                       <Card>
                                         <CardHeader>
-                                          <CardTitle className="text-lg">Financial Details</CardTitle>
+                                          <CardTitle className="text-lg">Quality & Weight Details</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-3">
-                                          <div>
-                                            <label className="text-sm font-medium text-gray-600">Amount</label>
-                                            <p className="text-2xl font-bold text-blue-600">₹{selectedTransaction.amount.toLocaleString()}</p>
-                                          </div>
                                           {selectedTransaction.weight && (
                                             <div>
                                               <label className="text-sm font-medium text-gray-600">Weight</label>
@@ -329,7 +327,7 @@ const TransactionsPage = () => {
                                           )}
                                           {selectedTransaction.wages && (
                                             <div>
-                                              <label className="text-sm font-medium text-gray-600">Wages</label>
+                                              <label className="text-sm font-medium text-gray-600">Wages (per gram)</label>
                                               <p className="text-gray-900">₹{selectedTransaction.wages}</p>
                                             </div>
                                           )}
@@ -339,26 +337,41 @@ const TransactionsPage = () => {
                                               <p className="text-gray-900">{selectedTransaction.wastage}%</p>
                                             </div>
                                           )}
-                                          {selectedTransaction.silver_amount && (
-                                            <div>
-                                              <label className="text-sm font-medium text-gray-600">Silver Amount</label>
-                                              <p className="text-gray-900">₹{selectedTransaction.silver_amount.toLocaleString()}</p>
-                                            </div>
-                                          )}
                                         </CardContent>
                                       </Card>
                                     </div>
                                     
-                                    {selectedTransaction.description && (
-                                      <Card>
-                                        <CardHeader>
-                                          <CardTitle className="text-lg">Description</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                          <p className="text-gray-900">{selectedTransaction.description}</p>
-                                        </CardContent>
-                                      </Card>
-                                    )}
+                                    <Card>
+                                      <CardHeader>
+                                        <CardTitle className="text-lg">Financial Details</CardTitle>
+                                      </CardHeader>
+                                      <CardContent className="space-y-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                          <div>
+                                            <label className="text-sm font-medium text-gray-600">Amount</label>
+                                            <p className="text-2xl font-bold text-blue-600">₹{selectedTransaction.amount.toLocaleString()}</p>
+                                          </div>
+                                          {selectedTransaction.wages && selectedTransaction.weight && (
+                                            <div>
+                                              <label className="text-sm font-medium text-gray-600">Total Wages</label>
+                                              <p className="text-xl font-bold text-green-600">₹{(selectedTransaction.wages * selectedTransaction.weight).toFixed(2)}</p>
+                                            </div>
+                                          )}
+                                          {selectedTransaction.silver_amount && (
+                                            <div>
+                                              <label className="text-sm font-medium text-gray-600">Silver Amount</label>
+                                              <p className="text-xl font-bold text-gray-600">₹{selectedTransaction.silver_amount.toLocaleString()}</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {selectedTransaction.description && (
+                                          <div>
+                                            <label className="text-sm font-medium text-gray-600">Description</label>
+                                            <p className="text-gray-900">{selectedTransaction.description}</p>
+                                          </div>
+                                        )}
+                                      </CardContent>
+                                    </Card>
                                   </div>
                                 )}
                               </DialogContent>

@@ -3,14 +3,17 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, Clock, Users, TrendingUp, TrendingDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronDown, ChevronUp, Clock, Users, TrendingUp, TrendingDown, Eye, Printer } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { customerAPI } from "@/services/api";
+import { customerAPI, billAPI } from "@/services/api";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const PendingListPage = () => {
   const [expandedCustomers, setExpandedCustomers] = useState<Set<number>>(new Set());
+  const [selectedBill, setSelectedBill] = useState<any>(null);
+  const [showBillDialog, setShowBillDialog] = useState(false);
 
   const { data: pendingCustomers = [], isLoading } = useQuery({
     queryKey: ['customers', 'pending'],
@@ -38,6 +41,57 @@ const PendingListPage = () => {
     },
     enabled: expandedCustomers.size > 0,
   });
+
+  const handleBillDetails = async (billId: number) => {
+    try {
+      const billDetails = await billAPI.getById(billId);
+      setSelectedBill(billDetails);
+      setShowBillDialog(true);
+    } catch (error) {
+      console.error('Error fetching bill details:', error);
+    }
+  };
+
+  const handlePrintBill = (bill: any) => {
+    const totalWages = (bill.wages || 0) * (bill.weight || 0);
+    const printContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+        <h2 style="text-align: center; margin-bottom: 30px;">Bill Details</h2>
+        <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <strong>Bill Number:</strong> ${bill.bill_number || 'N/A'}<br>
+              <strong>Customer:</strong> ${bill.customer_name}<br>
+              <strong>Item:</strong> ${bill.item}<br>
+              <strong>Payment Type:</strong> ${bill.payment_type.toUpperCase()}
+            </div>
+            <div>
+              <strong>Weight:</strong> ${bill.weight || 'N/A'} gm<br>
+              <strong>Tunch:</strong> ${bill.tunch || 'N/A'}%<br>
+              <strong>Wastage:</strong> ${bill.wastage || 'N/A'}%<br>
+              <strong>Wages:</strong> ₹${bill.wages || 'N/A'}/gm
+            </div>
+          </div>
+          <div style="margin-bottom: 20px;">
+            <strong>Total Fine:</strong> ${bill.total_fine || 'N/A'} gm<br>
+            <strong>Total Wages:</strong> ₹${totalWages.toFixed(2)}<br>
+            <strong>Total Amount:</strong> ₹${bill.total_amount.toLocaleString()}
+            ${bill.silver_amount ? `<br><strong>Silver Amount:</strong> ₹${bill.silver_amount.toLocaleString()}` : ''}
+          </div>
+          <div style="text-align: right;">
+            <strong>Date:</strong> ${format(new Date(bill.date), 'dd/MM/yyyy')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -138,12 +192,36 @@ const PendingListPage = () => {
                                 <div key={bill.id} className="p-2 bg-green-50 rounded border border-green-200">
                                   <div className="flex justify-between items-center">
                                     <div>
-                                      <div className="font-medium text-sm">Bill #{bill.id} - {bill.item}</div>
+                                      <div className="font-medium text-sm">Bill #{bill.bill_number} - {bill.item}</div>
                                       <div className="text-xs text-gray-600">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
+                                      <div className="text-xs text-gray-600">
+                                        Weight: {bill.weight}g | Tunch: {bill.tunch}% | Wages: ₹{bill.wages}/g
+                                      </div>
+                                      {bill.silver_amount && (
+                                        <div className="text-xs text-blue-600">Silver: ₹{bill.silver_amount.toLocaleString()}</div>
+                                      )}
                                     </div>
                                     <div className="text-right">
                                       <div className="text-sm font-semibold text-green-700">{bill.total_fine.toFixed(4)}g</div>
                                       <div className="text-sm text-green-600">₹{bill.total_amount.toFixed(2)}</div>
+                                      <div className="flex gap-1 mt-1">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleBillDetails(bill.id)}
+                                          className="text-xs px-2 py-1"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handlePrintBill(bill)}
+                                          className="text-xs px-2 py-1"
+                                        >
+                                          <Printer className="h-3 w-3" />
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -161,12 +239,33 @@ const PendingListPage = () => {
                                 <div key={bill.id} className="p-2 bg-red-50 rounded border border-red-200">
                                   <div className="flex justify-between items-center">
                                     <div>
-                                      <div className="font-medium text-sm">Bill #{bill.id} - {bill.item}</div>
+                                      <div className="font-medium text-sm">Bill #{bill.bill_number} - {bill.item}</div>
                                       <div className="text-xs text-gray-600">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
+                                      <div className="text-xs text-gray-600">
+                                        Weight: {bill.weight}g | Tunch: {bill.tunch}% | Wages: ₹{bill.wages}/g
+                                      </div>
                                     </div>
                                     <div className="text-right">
                                       <div className="text-sm font-semibold text-red-700">{bill.total_fine.toFixed(4)}g</div>
                                       <div className="text-sm text-red-600">₹{bill.total_amount.toFixed(2)}</div>
+                                      <div className="flex gap-1 mt-1">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleBillDetails(bill.id)}
+                                          className="text-xs px-2 py-1"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handlePrintBill(bill)}
+                                          className="text-xs px-2 py-1"
+                                        >
+                                          <Printer className="h-3 w-3" />
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -183,6 +282,117 @@ const PendingListPage = () => {
           </div>
         )}
       </div>
+
+      <Dialog open={showBillDialog} onOpenChange={setShowBillDialog}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-gray-900 flex items-center justify-between">
+              Bill Details - {selectedBill?.bill_number || 'N/A'}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => selectedBill && handlePrintBill(selectedBill)}
+                className="ml-4"
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          {selectedBill && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Bill Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Bill Number</label>
+                      <p className="text-gray-900">{selectedBill.bill_number || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Customer Name</label>
+                      <p className="text-gray-900 font-medium">{selectedBill.customer_name}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Item</label>
+                      <p className="text-gray-900">{selectedBill.item}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Payment Type</label>
+                      <div>
+                        <Badge 
+                          variant={selectedBill.payment_type === 'credit' ? 'default' : 'secondary'}
+                          className={selectedBill.payment_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                        >
+                          {selectedBill.payment_type.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Weight & Quality Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Weight</label>
+                      <p className="text-gray-900">{selectedBill.weight} gm</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Tunch</label>
+                      <p className="text-gray-900">{selectedBill.tunch}%</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Wastage</label>
+                      <p className="text-gray-900">{selectedBill.wastage}%</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Total Fine</label>
+                      <p className="text-gray-900">{selectedBill.total_fine} gm</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Financial Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Wages (per gram)</label>
+                      <p className="text-gray-900">₹{selectedBill.wages}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Total Wages</label>
+                      <p className="text-gray-900">₹{((selectedBill.wages || 0) * (selectedBill.weight || 0)).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Total Amount</label>
+                      <p className="text-2xl font-bold text-blue-600">₹{selectedBill.total_amount.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  {selectedBill.silver_amount && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Silver Amount</label>
+                      <p className="text-xl font-bold text-gray-600">₹{selectedBill.silver_amount.toLocaleString()}</p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Date</label>
+                    <p className="text-gray-900">{format(new Date(selectedBill.date), 'dd/MM/yyyy HH:mm')}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
