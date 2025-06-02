@@ -317,7 +317,19 @@ export const expenseAPI = {
 export const settingsAPI = {
   downloadBackup: async () => {
     const response = await fetch(`${API_BASE_URL}/settings/backup`);
-    return response.json();
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `metalic_backup_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      return { message: 'Backup downloaded successfully' };
+    }
+    throw new Error('Failed to download backup');
   },
   
   uploadBackup: async (file: File) => {

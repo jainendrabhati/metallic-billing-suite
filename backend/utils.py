@@ -4,12 +4,14 @@ import pandas as pd
 from flask import current_app
 from datetime import datetime
 import os
+import zipfile
+import tempfile
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from models import db, Customer, Bill, Transaction, Expense
+from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, StockItem, Stock, FirmSettings
 
 def export_to_csv(data, data_type):
     """Export data to CSV format"""
@@ -20,7 +22,7 @@ def export_to_csv(data, data_type):
     if data_type == 'transactions':
         with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['Transaction ID', 'Bill Number', 'Customer Name', 'Amount', 'Type', 'Status', 'Date', 'Description'])
+            writer.writerow(['Transaction ID', 'Bill Number', 'Customer Name', 'Amount', 'Type', 'Date', 'Description'])
             
             for transaction in data:
                 writer.writerow([
@@ -29,7 +31,6 @@ def export_to_csv(data, data_type):
                     transaction.customer.name if transaction.customer else '',
                     transaction.amount,
                     transaction.transaction_type,
-                    transaction.status,
                     transaction.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                     transaction.description or ''
                 ])
@@ -77,7 +78,7 @@ def export_to_pdf(data, data_type):
     
     if data_type == 'transactions':
         # Create table data
-        table_data = [['Transaction ID', 'Bill Number', 'Customer', 'Amount', 'Type', 'Status', 'Date']]
+        table_data = [['Transaction ID', 'Bill Number', 'Customer', 'Amount', 'Type', 'Date']]
         
         for transaction in data:
             table_data.append([
@@ -86,7 +87,6 @@ def export_to_pdf(data, data_type):
                 transaction.customer.name if transaction.customer else '',
                 f"₹{transaction.amount:,.2f}",
                 transaction.transaction_type.title(),
-                transaction.status.title(),
                 transaction.created_at.strftime('%Y-%m-%d')
             ])
     
@@ -124,108 +124,134 @@ def export_to_pdf(data, data_type):
     return filename
 
 def backup_database():
-    """Create a backup of the entire database"""
+    """Create a backup of the entire database as CSV files in a ZIP"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"metalic_backup_{timestamp}.xlsx"
-    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    zip_filename = f"metalic_backup_{timestamp}.zip"
+    zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
     
-    with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
-        # Export customers
-        customers = Customer.query.all()
-        customers_data = [customer.to_dict() for customer in customers]
-        pd.DataFrame(customers_data).to_excel(writer, sheet_name='Customers', index=False)
+    # Create a temporary directory for CSV files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Export each model to CSV
+        models_data = {
+            'customers': Customer.query.all(),
+            'bills': Bill.query.all(),
+            'transactions': Transaction.query.all(),
+            'expenses': Expense.query.all(),
+            'employees': Employee.query.all(),
+            'employee_payments': EmployeePayment.query.all(),
+            'stock_items': StockItem.query.all(),
+            'stock': Stock.query.all(),
+            'firm_settings': FirmSettings.query.all()
+        }
         
-        # Export bills
-        bills = Bill.query.all()
-        bills_data = [bill.to_dict() for bill in bills]
-        pd.DataFrame(bills_data).to_excel(writer, sheet_name='Bills', index=False)
+        csv_files = []
         
-        # Export transactions
-        transactions = Transaction.query.all()
-        transactions_data = [transaction.to_dict() for transaction in transactions]
-        pd.DataFrame(transactions_data).to_excel(writer, sheet_name='Transactions', index=False)
+        for model_name, data in models_data.items():
+            csv_filename = f"{model_name}.csv"
+            csv_filepath = os.path.join(temp_dir, csv_filename)
+            csv_files.append((csv_filepath, csv_filename))
+            
+            if data:
+                # Convert to DataFrame and save as CSV
+                df_data = [item.to_dict() for item in data]
+                pd.DataFrame(df_data).to_csv(csv_filepath, index=False)
+            else:
+                # Create empty CSV with headers
+                if model_name == 'customers':
+                    headers = ['id', 'name', 'mobile', 'address', 'total_bills', 'total_amount', 'status', 'created_at', 'updated_at']
+                elif model_name == 'bills':
+                    headers = ['id', 'bill_number', 'customer_id', 'item', 'weight', 'tunch', 'wages', 'wastage', 'silver_amount', 'total_fine', 'total_amount', 'payment_type', 'slip_no', 'description', 'date', 'created_at', 'updated_at']
+                elif model_name == 'transactions':
+                    headers = ['id', 'bill_id', 'customer_id', 'amount', 'transaction_type', 'description', 'created_at', 'updated_at']
+                elif model_name == 'expenses':
+                    headers = ['id', 'description', 'amount', 'category', 'status', 'date', 'created_at', 'updated_at']
+                elif model_name == 'employees':
+                    headers = ['id', 'name', 'position', 'monthly_salary', 'present_days', 'total_days', 'calculated_salary', 'paid_amount', 'remaining_amount', 'created_at', 'updated_at']
+                elif model_name == 'employee_payments':
+                    headers = ['id', 'employee_id', 'amount', 'payment_date', 'description', 'created_at', 'updated_at']
+                elif model_name == 'stock_items':
+                    headers = ['id', 'item_name', 'current_weight', 'description', 'created_at', 'updated_at']
+                elif model_name == 'stock':
+                    headers = ['id', 'amount', 'transaction_type', 'item_name', 'description', 'created_at']
+                elif model_name == 'firm_settings':
+                    headers = ['id', 'firm_name', 'gst_number', 'address', 'logo_path', 'created_at', 'updated_at']
+                
+                pd.DataFrame(columns=headers).to_csv(csv_filepath, index=False)
         
-        # Export expenses
-        expenses = Expense.query.all()
-        expenses_data = [expense.to_dict() for expense in expenses]
-        pd.DataFrame(expenses_data).to_excel(writer, sheet_name='Expenses', index=False)
+        # Create ZIP file
+        with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for csv_filepath, csv_filename in csv_files:
+                zipf.write(csv_filepath, csv_filename)
     
-    return filename
+    return zip_filename
 
-def restore_database(file):
-    """Restore database from uploaded backup file"""
+def restore_database(zip_file):
+    """Restore database from uploaded ZIP file containing CSV files"""
     try:
-        # Read Excel file
-        excel_data = pd.read_excel(file, sheet_name=None)
-        
-        # Clear existing data (be careful!)
-        db.session.query(Transaction).delete()
-        db.session.query(Bill).delete()
-        db.session.query(Expense).delete()
-        db.session.query(Customer).delete()
-        db.session.commit()
-        
-        # Restore customers
-        if 'Customers' in excel_data:
-            for _, row in excel_data['Customers'].iterrows():
-                customer = Customer(
-                    name=row['name'],
-                    mobile=row['mobile'],
-                    address=row['address'],
-                    total_bills=row.get('total_bills', 0),
-                    total_amount=row.get('total_amount', 0.0),
-                    status=row.get('status', 'active')
-                )
-                db.session.add(customer)
-        
-        # Restore bills
-        if 'Bills' in excel_data:
-            for _, row in excel_data['Bills'].iterrows():
-                bill = Bill(
-                    customer_id=row['customer_id'],
-                    item=row['item'],
-                    weight=row['weight'],
-                    tunch=row['tunch'],
-                    wages=row['wages'],
-                    wastage=row['wastage'],
-                    total_fine=row['total_fine'],
-                    total_amount=row['total_amount'],
-                    payment_type=row['payment_type'],
-                    payment_status=row['payment_status'],
-                    partial_amount=row.get('partial_amount', 0.0),
-                    description=row.get('description', ''),
-                    gst_number=row.get('gst_number', ''),
-                    date=pd.to_datetime(row['date']).date()
-                )
-                db.session.add(bill)
-        
-        # Restore transactions
-        if 'Transactions' in excel_data:
-            for _, row in excel_data['Transactions'].iterrows():
-                transaction = Transaction(
-                    bill_id=row.get('bill_id'),
-                    customer_id=row['customer_id'],
-                    amount=row['amount'],
-                    transaction_type=row['transaction_type'],
-                    status=row['status'],
-                    description=row.get('description', '')
-                )
-                db.session.add(transaction)
-        
-        # Restore expenses
-        if 'Expenses' in excel_data:
-            for _, row in excel_data['Expenses'].iterrows():
-                expense = Expense(
-                    description=row['description'],
-                    amount=row['amount'],
-                    category=row['category'],
-                    status=row['status'],
-                    date=pd.to_datetime(row['date']).date()
-                )
-                db.session.add(expense)
-        
-        db.session.commit()
-        
+        # Create temporary directory to extract ZIP
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Extract ZIP file
+            with zipfile.ZipFile(zip_file, 'r') as zipf:
+                zipf.extractall(temp_dir)
+            
+            # Clear existing data (be careful!)
+            db.session.query(EmployeePayment).delete()
+            db.session.query(Employee).delete()
+            db.session.query(Stock).delete()
+            db.session.query(StockItem).delete()
+            db.session.query(Transaction).delete()
+            db.session.query(Bill).delete()
+            db.session.query(Expense).delete()
+            db.session.query(Customer).delete()
+            db.session.query(FirmSettings).delete()
+            db.session.commit()
+            
+            # Restore data from CSV files
+            csv_files = {
+                'customers.csv': Customer,
+                'bills.csv': Bill,
+                'transactions.csv': Transaction,
+                'expenses.csv': Expense,
+                'employees.csv': Employee,
+                'employee_payments.csv': EmployeePayment,
+                'stock_items.csv': StockItem,
+                'stock.csv': Stock,
+                'firm_settings.csv': FirmSettings
+            }
+            
+            for csv_filename, model_class in csv_files.items():
+                csv_filepath = os.path.join(temp_dir, csv_filename)
+                
+                if os.path.exists(csv_filepath):
+                    df = pd.read_csv(csv_filepath)
+                    
+                    if not df.empty:
+                        for _, row in df.iterrows():
+                            # Create model instance
+                            data = row.to_dict()
+                            
+                            # Remove id and timestamps for new creation
+                            if 'id' in data:
+                                del data['id']
+                            if 'created_at' in data:
+                                del data['created_at']
+                            if 'updated_at' in data:
+                                del data['updated_at']
+                            
+                            # Handle date fields
+                            if model_class == Bill and 'date' in data:
+                                data['date'] = pd.to_datetime(data['date']).date()
+                            elif model_class == Expense and 'date' in data:
+                                data['date'] = pd.to_datetime(data['date']).date()
+                            elif model_class == EmployeePayment and 'payment_date' in data:
+                                data['payment_date'] = pd.to_datetime(data['payment_date']).date()
+                            
+                            # Create instance
+                            instance = model_class(**data)
+                            db.session.add(instance)
+            
+            db.session.commit()
+            
     except Exception as e:
         db.session.rollback()
         raise e

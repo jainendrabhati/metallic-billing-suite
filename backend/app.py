@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from datetime import datetime, date
 import os
 from models import db, Customer, Bill, Transaction, Employee, EmployeePayment, StockItem, Stock, Expense, FirmSettings
 from flask import send_from_directory
+from utils import backup_database, restore_database
 
 app = Flask(__name__)
 CORS(app)
@@ -11,7 +12,7 @@ CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///./database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'zip'}
 
 # Ensure the uploads folder exists
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -321,7 +322,35 @@ def create_employee_payment():
     )
     return jsonify(payment.to_dict()), 201
 
-# Firm settings routes
+# Settings routes
+@app.route('/api/settings/backup', methods=['GET'])
+def download_backup():
+    try:
+        zip_filename = backup_database()
+        zip_filepath = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
+        return send_file(zip_filepath, as_attachment=True, download_name=zip_filename)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings/restore', methods=['POST'])
+def upload_backup():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if file and file.filename.endswith('.zip'):
+            restore_database(file)
+            return jsonify({'message': 'Database restored successfully'})
+        else:
+            return jsonify({'error': 'Invalid file format. Please upload a ZIP file.'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/settings/firm', methods=['GET'])
 def get_firm_settings():
     settings = FirmSettings.get_settings()
