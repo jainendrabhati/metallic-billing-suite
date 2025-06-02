@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +27,7 @@ const EmployeesPage = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [nameFilter, setNameFilter] = useState("");
+  const [positionFilter, setPositionFilter] = useState("");
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -44,8 +44,12 @@ const EmployeesPage = () => {
   });
 
   const filteredEmployees = employees.filter(employee => 
-    employee.name.toLowerCase().includes(nameFilter.toLowerCase())
+    employee.name.toLowerCase().includes(nameFilter.toLowerCase()) &&
+    (positionFilter === "" || employee.position.toLowerCase().includes(positionFilter.toLowerCase()))
   );
+
+  const uniqueEmployeeNames = [...new Set(employees.map(emp => emp.name))];
+  const uniquePositions = [...new Set(employees.map(emp => emp.position))];
 
   const existingEmployeeNames = employees.map(emp => emp.name);
 
@@ -131,8 +135,7 @@ const EmployeesPage = () => {
       return;
     }
 
-    // Check if employee already exists (for new employee creation)
-    if (selectedEmployeeName === "new" && existingEmployeeNames.includes(newEmployeeName)) {
+    if (selectedEmployeeName === "new" && uniqueEmployeeNames.includes(newEmployeeName)) {
       toast({
         title: "Error",
         description: "Employee with this name already exists.",
@@ -141,7 +144,6 @@ const EmployeesPage = () => {
       return;
     }
 
-    // If existing employee is selected, update them
     if (selectedEmployeeName !== "new" && selectedEmployeeName !== "") {
       const existingEmployee = employees.find(emp => emp.name === selectedEmployeeName);
       if (existingEmployee) {
@@ -158,7 +160,6 @@ const EmployeesPage = () => {
       }
     }
 
-    // Create new employee
     createEmployeeMutation.mutate({
       name: employeeName,
       position,
@@ -215,12 +216,12 @@ const EmployeesPage = () => {
   };
 
   return (
-    <div className="space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen p-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
+    <div className="space-y-6 bg-gray-50 min-h-screen p-6">
+      <div className="bg-white rounded-lg shadow-sm border p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Employee Management</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Manage employee details and track payments</p>
+            <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
+            <p className="text-gray-600 mt-1">Manage employee details and track payments</p>
           </div>
         </div>
 
@@ -242,7 +243,7 @@ const EmployeesPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="new">Add New Employee</SelectItem>
-                      {existingEmployeeNames.map((name) => (
+                      {uniqueEmployeeNames.map((name) => (
                         <SelectItem key={name} value={name}>{name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -322,17 +323,30 @@ const EmployeesPage = () => {
         </Card>
 
         <Card className="shadow-lg border-0">
-          <CardHeader className="bg-gray-50 dark:bg-gray-700 border-b">
+          <CardHeader className="bg-gray-50 border-b">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold text-gray-800 dark:text-white">Employee List</CardTitle>
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 text-gray-500" />
-                <Input
-                  placeholder="Filter by name..."
-                  value={nameFilter}
-                  onChange={(e) => setNameFilter(e.target.value)}
-                  className="w-48"
-                />
+              <CardTitle className="text-lg font-semibold text-gray-800">Employee List</CardTitle>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4 text-gray-500" />
+                  <Input
+                    placeholder="Filter by name..."
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                    className="w-48"
+                  />
+                </div>
+                <Select value={positionFilter} onValueChange={setPositionFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filter by position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Positions</SelectItem>
+                    {uniquePositions.map((position) => (
+                      <SelectItem key={position} value={position}>{position}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardHeader>
@@ -340,29 +354,29 @@ const EmployeesPage = () => {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50 dark:bg-gray-700">
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Name</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Position</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Salary</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Present Days</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Total Days</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Calculated Salary</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Paid</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Remaining</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700">Name</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Position</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Salary</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Present Days</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Total Days</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Calculated Salary</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Paid</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Remaining</TableHead>
                     <TableHead className="w-[150px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredEmployees.map((employee) => (
-                    <TableRow key={employee.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-600">
-                      <TableCell className="text-gray-700 dark:text-gray-300">{employee.name}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">{employee.position}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">₹{employee.monthly_salary}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">{employee.present_days}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">{employee.total_days}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">₹{employee.calculated_salary}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">₹{employee.paid_amount}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">
+                    <TableRow key={employee.id} className="hover:bg-gray-50 border-b border-gray-100">
+                      <TableCell className="text-gray-700">{employee.name}</TableCell>
+                      <TableCell className="text-gray-700">{employee.position}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.monthly_salary}</TableCell>
+                      <TableCell className="text-gray-700">{employee.present_days}</TableCell>
+                      <TableCell className="text-gray-700">{employee.total_days}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.calculated_salary}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.paid_amount}</TableCell>
+                      <TableCell className="text-gray-700">
                         <Badge variant={employee.remaining_amount > 0 ? "destructive" : "default"}>
                           ₹{employee.remaining_amount}
                         </Badge>
@@ -390,8 +404,8 @@ const EmployeesPage = () => {
               {filteredEmployees.length === 0 && (
                 <div className="text-center py-12">
                   <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No employees found</h3>
-                  <p className="text-gray-500 dark:text-gray-400">New employees will appear here</p>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+                  <p className="text-gray-500">New employees will appear here</p>
                 </div>
               )}
             </div>
@@ -462,7 +476,7 @@ const EmployeesPage = () => {
               </TableBody>
             </Table>
             {employeePayments.length === 0 && (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-8 text-gray-500">
                 No payment history found
               </div>
             )}

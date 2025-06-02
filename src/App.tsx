@@ -24,36 +24,33 @@ import {
 const queryClient = new QueryClient()
 import PendingListPage from "@/pages/PendingListPage";
 import StockPage from "@/pages/StockPage";
-import { ThemeProvider } from "@/components/ThemeProvider";
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system">
-        <Toaster />
-        <Router>
-          <SidebarProvider>
-            <div className="min-h-screen flex w-full">
-              <AppSidebar />
-              <main className="flex-1">
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/billing" element={<BillingPage />} />
-                  <Route path="/customers" element={<CustomersPage />} />
-                  <Route path="/pending-list" element={<PendingListPage />} />
-                  <Route path="/transactions" element={<TransactionsPage />} />
-                  <Route path="/employees" element={<EmployeesPage />} />
-                  <Route path="/expenses" element={<ExpensesPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/stock" element={<StockPage />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-            </div>
-          </SidebarProvider>
-        </Router>
-      </ThemeProvider>
+      <Toaster />
+      <Router>
+        <SidebarProvider>
+          <div className="min-h-screen flex w-full">
+            <AppSidebar />
+            <main className="flex-1">
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/billing" element={<BillingPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/pending-list" element={<PendingListPage />} />
+                <Route path="/transactions" element={<TransactionsPage />} />
+                <Route path="/employees" element={<EmployeesPage />} />
+                <Route path="/expenses" element={<ExpensesPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/stock" element={<StockPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+          </div>
+        </SidebarProvider>
+      </Router>
     </QueryClientProvider>
   );
 }

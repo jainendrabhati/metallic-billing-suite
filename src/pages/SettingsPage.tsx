@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,15 +24,18 @@ const SettingsPage = () => {
   const { data: settings } = useQuery({
     queryKey: ['firmSettings'],
     queryFn: settingsAPI.getFirmSettings,
-    onSuccess: (data) => {
+  });
+
+  useEffect(() => {
+    if (settings) {
       setFirmSettings({
-        firmName: data.firm_name || "",
-        gstNumber: data.gst_number || "",
-        address: data.address || "",
+        firmName: settings.firm_name || "",
+        gstNumber: settings.gst_number || "",
+        address: settings.address || "",
         firmLogo: null,
       });
-    },
-  });
+    }
+  }, [settings]);
 
   const updateSettingsMutation = useMutation({
     mutationFn: settingsAPI.updateFirmSettings,
@@ -124,7 +127,7 @@ const SettingsPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
         <Button 
           onClick={handleSaveSettings} 
           className="flex items-center gap-2"
@@ -174,11 +177,11 @@ const SettingsPage = () => {
 
             <div>
               <Label htmlFor="logo">Firm Logo</Label>
-              <div className="mt-1 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+              <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 {firmSettings.firmLogo ? (
                   <div className="space-y-2">
                     <Image className="h-8 w-8 text-gray-400 mx-auto" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{firmSettings.firmLogo.name}</p>
+                    <p className="text-sm text-gray-600">{firmSettings.firmLogo.name}</p>
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -190,7 +193,7 @@ const SettingsPage = () => {
                 ) : (
                   <div className="space-y-2">
                     <Image className="h-8 w-8 text-gray-400 mx-auto" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Upload your firm logo</p>
+                    <p className="text-sm text-gray-600">Upload your firm logo</p>
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -219,7 +222,7 @@ const SettingsPage = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <h3 className="font-medium">Download Backup</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 Download a complete backup of your database as CSV files in ZIP format
               </p>
               <Button 
@@ -235,12 +238,12 @@ const SettingsPage = () => {
             <div className="border-t pt-4">
               <div className="space-y-2">
                 <h3 className="font-medium">Upload Backup</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   Restore data from a previously downloaded backup ZIP file
                 </p>
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                   <Upload className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  <p className="text-sm text-gray-600 mb-2">
                     Choose backup ZIP file to upload
                   </p>
                   <Button 
@@ -263,9 +266,9 @@ const SettingsPage = () => {
             </div>
 
             <div className="border-t pt-4">
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-                <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">⚠️ Important Note</h4>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-800 mb-1">⚠️ Important Note</h4>
+                <p className="text-sm text-yellow-700">
                   Uploading a backup will replace all existing data. Make sure to download 
                   a current backup before proceeding.
                 </p>
