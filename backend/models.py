@@ -268,45 +268,33 @@ class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     position = db.Column(db.String(100), nullable=False)
-    monthly_salary = db.Column(db.Float, nullable=False)
-    present_days = db.Column(db.Integer, nullable=False)
-    total_days = db.Column(db.Integer, nullable=False)
-    calculated_salary = db.Column(db.Float, nullable=False)
-    paid_amount = db.Column(db.Float, default=0.0)
-    remaining_amount = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
+    salaries = db.relationship('EmployeeSalary', backref='employee', lazy=True, cascade='all, delete-orphan')
     payments = db.relationship('EmployeePayment', backref='employee', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
+        # Calculate totals from all salaries
+        total_calculated_salary = sum(salary.calculated_salary for salary in self.salaries)
+        total_paid_amount = sum(payment.amount for payment in self.payments)
+        remaining_amount = total_calculated_salary - total_paid_amount
+        
         return {
             'id': self.id,
             'name': self.name,
             'position': self.position,
-            'monthly_salary': self.monthly_salary,
-            'present_days': self.present_days,
-            'total_days': self.total_days,
-            'calculated_salary': self.calculated_salary,
-            'paid_amount': self.paid_amount,
-            'remaining_amount': self.remaining_amount,
+            'total_calculated_salary': total_calculated_salary,
+            'total_paid_amount': total_paid_amount,
+            'remaining_amount': remaining_amount,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
     @classmethod
-    def create(cls, name, position, monthly_salary, present_days, total_days):
-        calculated_salary = (monthly_salary * present_days) / total_days
-        employee = cls(
-            name=name,
-            position=position,
-            monthly_salary=monthly_salary,
-            present_days=present_days,
-            total_days=total_days,
-            calculated_salary=calculated_salary,
-            remaining_amount=calculated_salary
-        )
+    def create(cls, name, position):
+        employee = cls(name=name, position=position)
         db.session.add(employee)
         db.session.commit()
         return employee
@@ -320,27 +308,68 @@ class Employee(db.Model):
         return cls.query.get(employee_id)
 
     @classmethod
-    def update(cls, employee_id, data):
-        employee = cls.get_by_id(employee_id)
-        if employee:
-            for key, value in data.items():
-                if hasattr(employee, key):
-                    setattr(employee, key, value)
-            
-            # Recalculate salary if relevant fields changed
-            if 'monthly_salary' in data or 'present_days' in data or 'total_days' in data:
-                employee.calculated_salary = (employee.monthly_salary * employee.present_days) / employee.total_days
-                employee.remaining_amount = employee.calculated_salary - employee.paid_amount
-            
-            employee.updated_at = datetime.utcnow()
-            db.session.commit()
-        return employee
+    def get_by_name(cls, name):
+        return cls.query.filter_by(name=name).first()
 
-    def update_payments(self):
-        payments = EmployeePayment.query.filter_by(employee_id=self.id).all()
-        self.paid_amount = sum(payment.amount for payment in payments)
-        self.remaining_amount = self.calculated_salary - self.paid_amount
+class EmployeeSalary(db.Model):
+    __tablename__ = 'employee_salaries'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
+    month = db.Column(db.String(20), nullable=False)  # e.g., "January", "February"
+    year = db.Column(db.Integer, nullable=False)
+    monthly_salary = db.Column(db.Float, nullable=False)
+    present_days = db.Column(db.Integer, nullable=False)
+    total_days = db.Column(db.Integer, nullable=False)
+    calculated_salary = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Unique constraint for employee-month-year combination
+    __table_args__ = (db.UniqueConstraint('employee_id', 'month', 'year', name='unique_employee_month_year'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'employee_id': self.employee_id,
+            'employee_name': self.employee.name if self.employee else None,
+            'month': self.month,
+            'year': self.year,
+            'monthly_salary': self.monthly_salary,
+            'present_days': self.present_days,
+            'total_days': self.total_days,
+            'calculated_salary': self.calculated_salary,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def create(cls, employee_id, month, year, monthly_salary, present_days, total_days):
+        calculated_salary = (monthly_salary * present_days) / total_days
+        salary = cls(
+            employee_id=employee_id,
+            month=month,
+            year=year,
+            monthly_salary=monthly_salary,
+            present_days=present_days,
+            total_days=total_days,
+            calculated_salary=calculated_salary
+        )
+        db.session.add(salary)
         db.session.commit()
+        return salary
+
+    @classmethod
+    def get_all(cls):
+        return cls.query.order_by(cls.year.desc(), cls.created_at.desc()).all()
+
+    @classmethod
+    def get_by_employee_id(cls, employee_id):
+        return cls.query.filter_by(employee_id=employee_id).order_by(cls.year.desc(), cls.created_at.desc()).all()
+
+    @classmethod
+    def get_by_id(cls, salary_id):
+        return cls.query.get(salary_id)
 
 class EmployeePayment(db.Model):
     __tablename__ = 'employee_payments'
@@ -370,12 +399,6 @@ class EmployeePayment(db.Model):
         payment = cls(**kwargs)
         db.session.add(payment)
         db.session.commit()
-        
-        # Update employee payment totals
-        employee = Employee.get_by_id(payment.employee_id)
-        if employee:
-            employee.update_payments()
-        
         return payment
 
     @classmethod

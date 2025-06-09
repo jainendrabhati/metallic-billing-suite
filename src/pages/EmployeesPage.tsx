@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,16 +9,23 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, Plus, Search, History } from "lucide-react";
+import { Users, Plus, Search, History, DollarSign } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { employeeAPI, employeePaymentAPI } from "@/services/api";
+import { employeeAPI, employeePaymentAPI, employeeSalaryAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
 const EmployeesPage = () => {
   const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
   const [newEmployeeName, setNewEmployeeName] = useState("");
   const [position, setPosition] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [monthlySalary, setMonthlySalary] = useState("");
   const [presentDays, setPresentDays] = useState("");
   const [totalDays, setTotalDays] = useState("");
@@ -26,6 +34,7 @@ const EmployeesPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [showSalaryHistory, setShowSalaryHistory] = useState(false);
   const [nameFilter, setNameFilter] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
 
@@ -37,21 +46,30 @@ const EmployeesPage = () => {
     queryFn: employeeAPI.getAll,
   });
 
+  const { data: employeeSalaries = [] } = useQuery({
+    queryKey: ['employeeSalaries'],
+    queryFn: employeeSalaryAPI.getAll,
+  });
+
   const { data: employeePayments = [] } = useQuery({
     queryKey: ['employeePayments', selectedEmployee?.id],
     queryFn: () => employeePaymentAPI.getByEmployeeId(selectedEmployee?.id),
     enabled: !!selectedEmployee,
   });
 
-  const filteredEmployees = employees.filter(employee => 
+  const { data: selectedEmployeeSalaries = [] } = useQuery({
+    queryKey: ['employeeSalaries', selectedEmployee?.id],
+    queryFn: () => employeeSalaryAPI.getByEmployeeId(selectedEmployee?.id),
+    enabled: !!selectedEmployee,
+  });
+
+  const filteredEmployees = employees.filter((employee: any) => 
     employee.name.toLowerCase().includes(nameFilter.toLowerCase()) &&
     (positionFilter === "all" || employee.position.toLowerCase().includes(positionFilter.toLowerCase()))
   );
 
-  const uniqueEmployeeNames = [...new Set(employees.map(emp => emp.name))];
-  const uniquePositions = [...new Set(employees.map(emp => emp.position))];
-
-  const existingEmployeeNames = employees.map(emp => emp.name);
+  const uniqueEmployeeNames = [...new Set(employees.map((emp: any) => emp.name))];
+  const uniquePositions = [...new Set(employees.map((emp: any) => emp.position))];
 
   const createEmployeeMutation = useMutation({
     mutationFn: employeeAPI.create,
@@ -72,19 +90,21 @@ const EmployeesPage = () => {
     },
   });
 
-  const updateEmployeeMutation = useMutation({
-    mutationFn: (data: { id: number; employee: Partial<any> }) => employeeAPI.update(data.id, data.employee),
+  const createEmployeeSalaryMutation = useMutation({
+    mutationFn: employeeSalaryAPI.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employeeSalaries'] });
       toast({
         title: "Success",
-        description: "Employee updated successfully!",
+        description: "Employee salary added successfully!",
       });
+      resetForm();
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update employee. Please try again.",
+        description: "Failed to add employee salary. Please try again.",
         variant: "destructive",
       });
     },
@@ -116,6 +136,8 @@ const EmployeesPage = () => {
     setSelectedEmployeeName("");
     setNewEmployeeName("");
     setPosition("");
+    setSelectedMonth("");
+    setSelectedYear(new Date().getFullYear().toString());
     setMonthlySalary("");
     setPresentDays("");
     setTotalDays("");
@@ -126,7 +148,7 @@ const EmployeesPage = () => {
     
     const employeeName = selectedEmployeeName === "new" ? newEmployeeName : selectedEmployeeName;
     
-    if (!employeeName || !position || !monthlySalary || !presentDays || !totalDays) {
+    if (!employeeName || !position || !selectedMonth || !monthlySalary || !presentDays || !totalDays) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -135,39 +157,53 @@ const EmployeesPage = () => {
       return;
     }
 
-    if (selectedEmployeeName === "new" && uniqueEmployeeNames.includes(newEmployeeName)) {
-      toast({
-        title: "Error",
-        description: "Employee with this name already exists.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (selectedEmployeeName !== "new" && selectedEmployeeName !== "") {
-      const existingEmployee = employees.find(emp => emp.name === selectedEmployeeName);
-      if (existingEmployee) {
-        updateEmployeeMutation.mutate({
-          id: existingEmployee.id,
-          employee: {
-            position,
-            monthly_salary: parseFloat(monthlySalary),
-            present_days: parseInt(presentDays),
-            total_days: parseInt(totalDays),
-          }
+    if (selectedEmployeeName === "new") {
+      if (uniqueEmployeeNames.includes(newEmployeeName)) {
+        toast({
+          title: "Error",
+          description: "Employee with this name already exists.",
+          variant: "destructive",
         });
         return;
       }
+      
+      // Create new employee first
+      createEmployeeMutation.mutate({
+        name: employeeName,
+        position: position,
+      });
     }
 
-    createEmployeeMutation.mutate({
-      name: employeeName,
-      position,
-      monthly_salary: parseFloat(monthlySalary),
-      present_days: parseInt(presentDays),
-      total_days: parseInt(totalDays),
-      paid_amount: 0,
-    });
+    // Find or create employee and add salary
+    let employeeId;
+    if (selectedEmployeeName === "new") {
+      // Wait for employee creation then add salary
+      setTimeout(() => {
+        const newEmployee = employees.find((emp: any) => emp.name === employeeName);
+        if (newEmployee) {
+          createEmployeeSalaryMutation.mutate({
+            employee_id: newEmployee.id,
+            month: selectedMonth,
+            year: parseInt(selectedYear),
+            monthly_salary: parseFloat(monthlySalary),
+            present_days: parseInt(presentDays),
+            total_days: parseInt(totalDays),
+          });
+        }
+      }, 1000);
+    } else {
+      const existingEmployee = employees.find((emp: any) => emp.name === selectedEmployeeName);
+      if (existingEmployee) {
+        createEmployeeSalaryMutation.mutate({
+          employee_id: existingEmployee.id,
+          month: selectedMonth,
+          year: parseInt(selectedYear),
+          monthly_salary: parseFloat(monthlySalary),
+          present_days: parseInt(presentDays),
+          total_days: parseInt(totalDays),
+        });
+      }
+    }
   };
 
   const handlePayment = (e: React.FormEvent) => {
@@ -187,32 +223,25 @@ const EmployeesPage = () => {
       payment_date: format(new Date(), 'yyyy-MM-dd'),
       description: paymentDescription,
     });
-
-    updateEmployeeMutation.mutate({
-      id: selectedEmployee.id,
-      employee: {
-        paid_amount: selectedEmployee.paid_amount + parseFloat(paymentAmount),
-      },
-    });
   };
 
   const handleEmployeeNameChange = (value: string) => {
     setSelectedEmployeeName(value);
     
     if (value !== "new" && value !== "") {
-      const employee = employees.find(emp => emp.name === value);
+      const employee = employees.find((emp: any) => emp.name === value);
       if (employee) {
         setPosition(employee.position);
-        setMonthlySalary(employee.monthly_salary.toString());
-        setPresentDays(employee.present_days.toString());
-        setTotalDays(employee.total_days.toString());
       }
     } else {
       setPosition("");
-      setMonthlySalary("");
-      setPresentDays("");
-      setTotalDays("");
     }
+    
+    // Reset other fields
+    setSelectedMonth("");
+    setMonthlySalary("");
+    setPresentDays("");
+    setTotalDays("");
   };
 
   return (
@@ -221,7 +250,7 @@ const EmployeesPage = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
-            <p className="text-gray-600 mt-1">Manage employee details and track payments</p>
+            <p className="text-gray-600 mt-1">Manage employee details and track monthly salaries</p>
           </div>
         </div>
 
@@ -229,12 +258,12 @@ const EmployeesPage = () => {
           <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
             <CardTitle className="flex items-center gap-2 text-xl">
               <Users className="h-5 w-5" />
-              Add/Update Employee
+              Add Employee Salary
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="employeeName">Employee Name</Label>
                   <Select value={selectedEmployeeName} onValueChange={handleEmployeeNameChange}>
@@ -275,6 +304,33 @@ const EmployeesPage = () => {
                     className="border-gray-300 focus:border-blue-500"
                   />
                 </div>
+
+                <div>
+                  <Label htmlFor="month">Month</Label>
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((month) => (
+                        <SelectItem key={month} value={month}>{month}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="year">Year</Label>
+                  <Input
+                    id="year"
+                    type="number"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    placeholder="Enter year"
+                    className="border-gray-300 focus:border-blue-500"
+                  />
+                </div>
+
                 <div>
                   <Label htmlFor="monthlySalary">Monthly Salary</Label>
                   <Input
@@ -313,10 +369,10 @@ const EmployeesPage = () => {
               <Button
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700"
-                disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
+                disabled={createEmployeeMutation.isPending || createEmployeeSalaryMutation.isPending}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                {selectedEmployeeName !== "new" && selectedEmployeeName !== "" ? "Update Employee" : "Add Employee"}
+                Add Employee Salary
               </Button>
             </form>
           </CardContent>
@@ -325,7 +381,7 @@ const EmployeesPage = () => {
         <Card className="shadow-lg border-0">
           <CardHeader className="bg-gray-50 border-b">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold text-gray-800">Employee List</CardTitle>
+              <CardTitle className="text-lg font-semibold text-gray-800">Employee Summary</CardTitle>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Search className="h-4 w-4 text-gray-500" />
@@ -357,25 +413,19 @@ const EmployeesPage = () => {
                   <TableRow className="bg-gray-50">
                     <TableHead className="font-semibold text-gray-700">Name</TableHead>
                     <TableHead className="font-semibold text-gray-700">Position</TableHead>
-                    <TableHead className="font-semibold text-gray-700">Salary</TableHead>
-                    <TableHead className="font-semibold text-gray-700">Present Days</TableHead>
-                    <TableHead className="font-semibold text-gray-700">Total Days</TableHead>
-                    <TableHead className="font-semibold text-gray-700">Calculated Salary</TableHead>
-                    <TableHead className="font-semibold text-gray-700">Paid</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Total Calculated</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Total Paid</TableHead>
                     <TableHead className="font-semibold text-gray-700">Remaining</TableHead>
-                    <TableHead className="w-[150px]"></TableHead>
+                    <TableHead className="w-[200px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.map((employee) => (
+                  {filteredEmployees.map((employee: any) => (
                     <TableRow key={employee.id} className="hover:bg-gray-50 border-b border-gray-100">
                       <TableCell className="text-gray-700">{employee.name}</TableCell>
                       <TableCell className="text-gray-700">{employee.position}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.monthly_salary}</TableCell>
-                      <TableCell className="text-gray-700">{employee.present_days}</TableCell>
-                      <TableCell className="text-gray-700">{employee.total_days}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.calculated_salary}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.paid_amount}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.total_calculated_salary}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.total_paid_amount}</TableCell>
                       <TableCell className="text-gray-700">
                         <Badge variant={employee.remaining_amount > 0 ? "destructive" : "default"}>
                           ₹{employee.remaining_amount}
@@ -387,13 +437,19 @@ const EmployeesPage = () => {
                             setSelectedEmployee(employee);
                             setShowPaymentDialog(true);
                           }}>
-                            Pay
+                            <DollarSign className="h-4 w-4" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedEmployee(employee);
                             setShowPaymentHistory(true);
                           }}>
                             <History className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedEmployee(employee);
+                            setShowSalaryHistory(true);
+                          }}>
+                            <Users className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -466,7 +522,7 @@ const EmployeesPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employeePayments.map((payment) => (
+                {employeePayments.map((payment: any) => (
                   <TableRow key={payment.id}>
                     <TableCell>₹{payment.amount}</TableCell>
                     <TableCell>{format(new Date(payment.payment_date), 'dd/MM/yyyy')}</TableCell>
@@ -478,6 +534,45 @@ const EmployeesPage = () => {
             {employeePayments.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 No payment history found
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSalaryHistory} onOpenChange={setShowSalaryHistory}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Salary History for {selectedEmployee?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Month</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead>Monthly Salary</TableHead>
+                  <TableHead>Present Days</TableHead>
+                  <TableHead>Total Days</TableHead>
+                  <TableHead>Calculated Salary</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedEmployeeSalaries.map((salary: any) => (
+                  <TableRow key={salary.id}>
+                    <TableCell>{salary.month}</TableCell>
+                    <TableCell>{salary.year}</TableCell>
+                    <TableCell>₹{salary.monthly_salary}</TableCell>
+                    <TableCell>{salary.present_days}</TableCell>
+                    <TableCell>{salary.total_days}</TableCell>
+                    <TableCell>₹{salary.calculated_salary}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {selectedEmployeeSalaries.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No salary history found
               </div>
             )}
           </div>
