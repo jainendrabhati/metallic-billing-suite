@@ -88,7 +88,7 @@ const ExpensesPage = () => {
     setDescription("");
     setAmount("");
     setCategory("");
-    setStatus("pending");
+    setStatus("pending" as "paid" | "pending");
     setDate(new Date());
     setEditingExpense(null);
   };
@@ -99,7 +99,7 @@ const ExpensesPage = () => {
     setDescription(expense.description);
     setAmount(expense.amount.toString());
     setCategory(expense.category);
-    setStatus(expense.status);
+    setStatus(expense.status as "paid" | "pending");
     setDate(new Date(expense.date));
     setIsDialogOpen(true);
   };

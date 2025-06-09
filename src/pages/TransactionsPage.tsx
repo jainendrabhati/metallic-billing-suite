@@ -27,7 +27,7 @@ const TransactionsPage = () => {
 
   const { data: transactions = [], refetch } = useQuery({
     queryKey: ['transactions', startDate, endDate, customerName],
-    queryFn: () => transactionAPI.getAll({ start_date: startDate, end_date: endDate, customer_name: customerName }),
+    queryFn: () => transactionAPI.getAll(),
   });
 
   const updateTransactionMutation = useMutation({
