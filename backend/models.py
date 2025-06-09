@@ -12,8 +12,6 @@ class Customer(db.Model):
     mobile = db.Column(db.String(15), nullable=False)
     address = db.Column(db.Text, nullable=False)
     total_bills = db.Column(db.Integer, default=0)
-    total_amount = db.Column(db.Float, default=0.0)
-    status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -28,8 +26,6 @@ class Customer(db.Model):
             'mobile': self.mobile,
             'address': self.address,
             'total_bills': self.total_bills,
-            'total_amount': self.total_amount,
-            'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -56,7 +52,6 @@ class Customer(db.Model):
     def update_totals(self):
         bills = Bill.query.filter_by(customer_id=self.id).all()
         self.total_bills = len(bills)
-        self.total_amount = sum(bill.total_amount for bill in bills)
         db.session.commit()
 
     @classmethod
@@ -99,6 +94,7 @@ class Bill(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     bill_number = db.Column(db.String(20), unique=True, nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    item_name = db.Column(db.String(100), nullable=False)
     item = db.Column(db.String(100), nullable=False)
     weight = db.Column(db.Float, nullable=False)
     tunch = db.Column(db.Float, nullable=False)
@@ -123,6 +119,7 @@ class Bill(db.Model):
             'bill_number': self.bill_number,
             'customer_id': self.customer_id,
             'customer_name': self.customer.name if self.customer else None,
+            'item_name': self.item_name,
             'item': self.item,
             'weight': self.weight,
             'tunch': self.tunch,
@@ -204,7 +201,8 @@ class Transaction(db.Model):
                 'wastage': self.bill.wastage,
                 'silver_amount': self.bill.silver_amount if self.bill.payment_type == 'credit' else 0,
                 'total_wages': self.bill.wages * self.bill.weight,
-                'item': self.bill.item
+                'item': self.bill.item,
+                'item_name': self.bill.item_name
             }
         
         return {
@@ -235,6 +233,17 @@ class Transaction(db.Model):
     @classmethod
     def get_by_id(cls, transaction_id):
         return cls.query.get(transaction_id)
+
+    @classmethod
+    def update(cls, transaction_id, data):
+        transaction = cls.get_by_id(transaction_id)
+        if transaction:
+            for key, value in data.items():
+                if hasattr(transaction, key):
+                    setattr(transaction, key, value)
+            transaction.updated_at = datetime.utcnow()
+            db.session.commit()
+        return transaction
 
     @classmethod
     def get_filtered(cls, start_date=None, end_date=None, customer_name=None):

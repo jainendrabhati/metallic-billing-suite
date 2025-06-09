@@ -1,15 +1,17 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Download, FileText, Eye, Printer } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Calendar, Download, FileText, Eye, Printer, Edit } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionAPI } from "@/services/api";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 const TransactionsPage = () => {
   const [startDate, setStartDate] = useState("");
@@ -17,10 +19,35 @@ const TransactionsPage = () => {
   const [customerName, setCustomerName] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editTransaction, setEditTransaction] = useState<any>(null);
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: transactions = [], refetch } = useQuery({
     queryKey: ['transactions', startDate, endDate, customerName],
     queryFn: () => transactionAPI.getAll({ start_date: startDate, end_date: endDate, customer_name: customerName }),
+  });
+
+  const updateTransactionMutation = useMutation({
+    mutationFn: (data: { id: number; updates: any }) => transactionAPI.update(data.id, data.updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully!",
+      });
+      setShowEditDialog(false);
+      setEditTransaction(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update transaction.",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleFilter = () => {
@@ -57,6 +84,29 @@ const TransactionsPage = () => {
     setShowDetailsDialog(true);
   };
 
+  const handleEditTransaction = (transaction: any) => {
+    setEditTransaction({
+      id: transaction.id,
+      amount: transaction.amount,
+      transaction_type: transaction.transaction_type,
+      description: transaction.description
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateTransaction = () => {
+    if (editTransaction) {
+      updateTransactionMutation.mutate({
+        id: editTransaction.id,
+        updates: {
+          amount: parseFloat(editTransaction.amount),
+          transaction_type: editTransaction.transaction_type,
+          description: editTransaction.description
+        }
+      });
+    }
+  };
+
   const handlePrintTransaction = (transaction: any) => {
     const printContent = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
@@ -72,7 +122,8 @@ const TransactionsPage = () => {
         ${transaction.wastage ? `<p><strong>Wastage:</strong> ${transaction.wastage}%</p>` : ''}
         ${transaction.total_wages ? `<p><strong>Total Wages:</strong> ₹${transaction.total_wages}</p>` : ''}
         ${transaction.silver_amount ? `<p><strong>Silver Amount:</strong> ₹${transaction.silver_amount}</p>` : ''}
-        ${transaction.item ? `<p><strong>Item:</strong> ${transaction.item}</p>` : ''}
+        ${transaction.item_name ? `<p><strong>Item Name:</strong> ${transaction.item_name}</p>` : ''}
+        ${transaction.item ? `<p><strong>Item Type:</strong> ${transaction.item}</p>` : ''}
       </div>
     `;
     
@@ -201,6 +252,13 @@ const TransactionsPage = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
+                          onClick={() => handleEditTransaction(transaction)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
                           onClick={() => handlePrintTransaction(transaction)}
                         >
                           <Printer className="h-4 w-4" />
@@ -219,6 +277,69 @@ const TransactionsPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+          </DialogHeader>
+          {editTransaction && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editAmount">Amount</Label>
+                <Input
+                  id="editAmount"
+                  type="number"
+                  step="0.01"
+                  value={editTransaction.amount}
+                  onChange={(e) => setEditTransaction({...editTransaction, amount: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label htmlFor="editType">Transaction Type</Label>
+                <Select 
+                  value={editTransaction.transaction_type} 
+                  onValueChange={(value) => setEditTransaction({...editTransaction, transaction_type: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="credit">Credit</SelectItem>
+                    <SelectItem value="debit">Debit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="editDescription">Description</Label>
+                <Textarea
+                  id="editDescription"
+                  value={editTransaction.description}
+                  onChange={(e) => setEditTransaction({...editTransaction, description: e.target.value})}
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleUpdateTransaction}
+                  disabled={updateTransactionMutation.isPending}
+                  className="flex-1"
+                >
+                  {updateTransactionMutation.isPending ? "Updating..." : "Update Transaction"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEditDialog(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent className="max-w-2xl">

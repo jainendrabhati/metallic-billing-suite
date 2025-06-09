@@ -26,6 +26,7 @@ const BillingPage = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [mobile, setMobile] = useState("");
   const [address, setAddress] = useState("");
+  const [itemName, setItemName] = useState("");
   const [item, setItem] = useState("");
   const [weight, setWeight] = useState("");
   const [tunch, setTunch] = useState("");
@@ -133,6 +134,7 @@ const BillingPage = () => {
     setSelectedCustomer(null);
     setMobile("");
     setAddress("");
+    setItemName("");
     setItem("");
     setWeight("");
     setTunch("");
@@ -150,7 +152,7 @@ const BillingPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!customerName || !mobile || !address || !item || !weight || !tunch || !wages || !wastage || !date) {
+    if (!customerName || !mobile || !address || !itemName || !item || !weight || !tunch || !wages || !wastage || !date) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -184,6 +186,7 @@ const BillingPage = () => {
     if (customerId) {
       createBillMutation.mutate({
         customer_id: customerId,
+        item_name: itemName,
         item,
         weight: parseFloat(weight),
         tunch: parseFloat(tunch),
@@ -280,10 +283,20 @@ const BillingPage = () => {
                     <h3 className="text-base font-semibold text-gray-800 mb-3">Bill Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <Label htmlFor="item" className="text-sm">Item *</Label>
+                        <Label htmlFor="itemName" className="text-sm">Item Name *</Label>
+                        <Input
+                          id="itemName"
+                          value={itemName}
+                          onChange={(e) => setItemName(e.target.value)}
+                          placeholder="Enter item name"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="item" className="text-sm">Item Type *</Label>
                         <Select value={item} onValueChange={setItem}>
                           <SelectTrigger className="border-gray-300 text-sm">
-                            <SelectValue placeholder="Select item" />
+                            <SelectValue placeholder="Select item type" />
                           </SelectTrigger>
                           <SelectContent>
                             {stockItems.map((stockItem) => (

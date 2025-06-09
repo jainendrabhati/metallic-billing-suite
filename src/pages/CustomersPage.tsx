@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,7 @@ const CustomersPage = () => {
               <Card key={customer.id} className="border border-gray-200 hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex-1 grid grid-cols-5 gap-4 items-center">
+                    <div className="flex-1 grid grid-cols-3 gap-4 items-center">
                       <div>
                         <div className="font-semibold text-gray-900">{customer.name}</div>
                         <div className="text-sm text-gray-500">CUST-{customer.id.toString().padStart(4, '0')}</div>
@@ -95,22 +96,12 @@ const CustomersPage = () => {
                         <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                         <span className="text-gray-700 line-clamp-2">{customer.address}</span>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
                       <div className="text-center">
                         <div className="font-semibold text-gray-900">{customer.total_bills}</div>
                         <div className="text-sm text-gray-500">Bills</div>
                       </div>
-                      <div className="text-center">
-                        <div className="font-bold text-green-600">₹{customer.total_amount.toLocaleString()}</div>
-                        <div className="text-sm text-gray-500">Total Amount</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <Badge 
-                        variant={customer.status === 'active' ? 'default' : 'secondary'}
-                        className={customer.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}
-                      >
-                        {customer.status.toUpperCase()}
-                      </Badge>
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button 
@@ -123,7 +114,7 @@ const CustomersPage = () => {
                             View Profile
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle className="text-2xl font-bold text-gray-900">
                               Customer Profile - {customer.name}
@@ -149,17 +140,6 @@ const CustomersPage = () => {
                                       <label className="text-sm font-medium text-gray-600">Address</label>
                                       <p className="text-gray-900">{selectedCustomer.address}</p>
                                     </div>
-                                    <div>
-                                      <label className="text-sm font-medium text-gray-600">Status</label>
-                                      <div>
-                                        <Badge 
-                                          variant={selectedCustomer.status === 'active' ? 'default' : 'secondary'}
-                                          className={selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}
-                                        >
-                                          {selectedCustomer.status.toUpperCase()}
-                                        </Badge>
-                                      </div>
-                                    </div>
                                   </CardContent>
                                 </Card>
                                 
@@ -171,10 +151,6 @@ const CustomersPage = () => {
                                     <div>
                                       <label className="text-sm font-medium text-gray-600">Total Bills</label>
                                       <p className="text-2xl font-bold text-blue-600">{selectedCustomer.total_bills}</p>
-                                    </div>
-                                    <div>
-                                      <label className="text-sm font-medium text-gray-600">Total Amount</label>
-                                      <p className="text-2xl font-bold text-green-600">₹{selectedCustomer.total_amount.toLocaleString()}</p>
                                     </div>
                                     <div>
                                       <label className="text-sm font-medium text-gray-600">Customer Since</label>
@@ -196,25 +172,46 @@ const CustomersPage = () => {
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                  <div className="space-y-3">
-                                    {getCustomerBills(selectedCustomer.id).slice(0, 5).map((bill) => (
-                                      <div key={bill.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                        <div>
-                                          <div className="font-medium">Bill #{bill.id}</div>
-                                          <div className="text-sm text-gray-600">{bill.item}</div>
-                                          <div className="text-xs text-gray-500">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="font-semibold text-green-600">₹{bill.total_amount.toFixed(2)}</div>
-                                          <Badge 
-                                            variant={bill.payment_type === 'credit' ? 'default' : 'secondary'}
-                                            className={`text-xs ${bill.payment_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-                                          >
-                                            {bill.payment_type.toUpperCase()}
-                                          </Badge>
-                                        </div>
-                                      </div>
-                                    ))}
+                                  <div className="overflow-x-auto">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Bill #</TableHead>
+                                          <TableHead>Item Name</TableHead>
+                                          <TableHead>Weight (g)</TableHead>
+                                          <TableHead>Tunch (%)</TableHead>
+                                          <TableHead>Wastage (%)</TableHead>
+                                          <TableHead>Wages</TableHead>
+                                          <TableHead>Total Fine (g)</TableHead>
+                                          <TableHead>Total Amount</TableHead>
+                                          <TableHead>Date</TableHead>
+                                          <TableHead>Type</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {getCustomerBills(selectedCustomer.id).slice(0, 10).map((bill) => (
+                                          <TableRow key={bill.id}>
+                                            <TableCell className="font-medium">{bill.bill_number}</TableCell>
+                                            <TableCell>{bill.item_name || bill.item}</TableCell>
+                                            <TableCell>{bill.weight.toFixed(4)}</TableCell>
+                                            <TableCell>{bill.tunch.toFixed(2)}</TableCell>
+                                            <TableCell>{bill.wastage.toFixed(2)}</TableCell>
+                                            <TableCell>₹{bill.wages.toFixed(2)}</TableCell>
+                                            <TableCell>{(bill.weight * ((bill.tunch - bill.wastage) / 100)).toFixed(4)}</TableCell>
+                                            <TableCell className="font-semibold text-green-600">₹{bill.total_amount.toFixed(2)}</TableCell>
+                                            <TableCell>{format(new Date(bill.date), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell>
+                                              <Badge 
+                                                variant={bill.payment_type === 'credit' ? 'default' : 'secondary'}
+                                                className={`text-xs ${bill.payment_type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                                              >
+                                                {bill.payment_type.toUpperCase()}
+                                              </Badge>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
                                   </div>
                                 </CardContent>
                               </Card>

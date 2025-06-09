@@ -1,3 +1,5 @@
+import { format } from 'date-fns';
+
 const API_BASE_URL = 'http://localhost:5000/api';
 
 export interface Customer {
@@ -17,6 +19,7 @@ export interface Bill {
   bill_number: string;
   customer_id: number;
   customer_name?: string;
+  item_name: string;
   item: string;
   weight: number;
   tunch: number;
@@ -25,8 +28,8 @@ export interface Bill {
   silver_amount: number;
   total_fine: number;
   total_amount: number;
-  total_wages?: number;
-  payment_type: 'credit' | 'debit';
+  total_wages: number;
+  payment_type: string;
   slip_no: string;
   description: string;
   date: string;
@@ -34,379 +37,219 @@ export interface Bill {
   updated_at: string;
 }
 
-export interface StockItem {
-  id: number;
-  item_name: string;
-  current_weight: number;
-  description: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ExpenseDashboard {
-  total_expenses: number;
-  net_fine: number;
-  total_bill_amount: number;
-  total_silver_amount: number;
-  total_wages_weight: number;
-  balance_sheet: {
-    silver_balance: number;
-    rupee_balance: number;
-  };
-}
-
-export interface Transaction {
-  id: number;
-  bill_id?: number;
-  bill_number?: string;
-  customer_id: number;
-  customer_name?: string;
-  amount: number;
-  transaction_type: 'credit' | 'debit';
-  description: string;
-  created_at: string;
-  updated_at: string;
-  weight?: number;
-  tunch?: number;
-  wages?: number;
-  wastage?: number;
-  silver_amount?: number;
-  total_wages?: number;
-  item?: string;
-}
-
-export interface Expense {
-  id: number;
-  description: string;
-  amount: number;
-  category: string;
-  status: 'paid' | 'pending';
-  date: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Employee {
-  id: number;
-  name: string;
-  position: string;
-  monthly_salary: number;
-  present_days: number;
-  total_days: number;
-  calculated_salary: number;
-  paid_amount: number;
-  remaining_amount: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface EmployeePayment {
-  id: number;
-  employee_id: number;
-  employee_name?: string;
-  amount: number;
-  payment_date: string;
-  description: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Stock {
-  id: number;
-  amount: number;
-  transaction_type: 'add' | 'deduct';
-  item_name: string;
-  description: string;
-  created_at: string;
-}
-
-export interface FirmSettings {
-  id: number;
-  firm_name: string;
-  gst_number: string;
-  address: string;
-  logo_path?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-// Customer API
 export const customerAPI = {
   getAll: async (): Promise<Customer[]> => {
     const response = await fetch(`${API_BASE_URL}/customers`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch customers');
+    }
     return response.json();
   },
-  
-  create: async (customer: Omit<Customer, 'id' | 'total_bills' | 'total_amount' | 'status' | 'created_at' | 'updated_at'>): Promise<Customer> => {
-    const response = await fetch(`${API_BASE_URL}/customers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(customer),
-    });
-    return response.json();
-  },
-  
-  search: async (query: string): Promise<Customer[]> => {
-    const response = await fetch(`${API_BASE_URL}/customers/search?q=${encodeURIComponent(query)}`);
-    return response.json();
-  },
-  
+
   getById: async (id: number): Promise<Customer> => {
     const response = await fetch(`${API_BASE_URL}/customers/${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch customer');
+    }
     return response.json();
   },
 
-  getPending: async (): Promise<any[]> => {
+  create: async (data: Omit<Customer, 'id' | 'total_bills' | 'total_amount' | 'status' | 'created_at' | 'updated_at'>): Promise<Customer> => {
+    const response = await fetch(`${API_BASE_URL}/customers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create customer');
+    }
+    return response.json();
+  },
+
+  search: async (name: string): Promise<Customer[]> => {
+    const response = await fetch(`${API_BASE_URL}/customers/search?name=${name}`);
+    if (!response.ok) {
+      throw new Error('Failed to search customers');
+    }
+    return response.json();
+  },
+
+  getPendingList: async (): Promise<any[]> => {
     const response = await fetch(`${API_BASE_URL}/customers/pending`);
-    return response.json();
-  },
-
-  getBills: async (customerId: number): Promise<Bill[]> => {
-    const response = await fetch(`${API_BASE_URL}/customers/${customerId}/bills`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch pending customers');
+    }
     return response.json();
   },
 };
 
-// Bill API
 export const billAPI = {
   getAll: async (): Promise<Bill[]> => {
     const response = await fetch(`${API_BASE_URL}/bills`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch bills');
+    }
     return response.json();
   },
-  
-  create: async (bill: Omit<Bill, 'id' | 'bill_number' | 'customer_name' | 'total_fine' | 'total_amount' | 'created_at' | 'updated_at'>): Promise<Bill> => {
-    const response = await fetch(`${API_BASE_URL}/bills`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bill),
-    });
-    return response.json();
-  },
-  
+
   getById: async (id: number): Promise<Bill> => {
     const response = await fetch(`${API_BASE_URL}/bills/${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch bill');
+    }
+    return response.json();
+  },
+
+  create: async (data: Omit<Bill, 'id' | 'bill_number' | 'total_fine' | 'total_amount' | 'total_wages' | 'created_at' | 'updated_at' | 'customer_name'>): Promise<Bill> => {
+    // Calculate total_fine and total_amount here before sending to the backend
+    const totalFine = data.weight * ((data.tunch - data.wastage) / 100);
+    const totalAmount = (data.weight * (data.wages / 1000)) + (data.payment_type === 'credit' ? data.silver_amount : 0);
+
+    const billData = {
+      ...data,
+      total_fine: totalFine,
+      total_amount: totalAmount,
+    };
+
+    const response = await fetch(`${API_BASE_URL}/bills`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(billData),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create bill');
+    }
+    return response.json();
+  },
+
+  getByCustomer: async (customerId: number): Promise<Bill[]> => {
+    const response = await fetch(`${API_BASE_URL}/bills/customer/${customerId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch bills for customer');
+    }
     return response.json();
   },
 };
 
-// Stock Item API
 export const stockItemAPI = {
-  getAll: async (): Promise<StockItem[]> => {
-    const response = await fetch(`${API_BASE_URL}/stock-items`);
+  getAll: async (): Promise<any[]> => {
+    const response = await fetch(`${API_BASE_URL}/stock_items`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch stock items');
+    }
     return response.json();
   },
-  
-  create: async (item: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>): Promise<StockItem> => {
-    const response = await fetch(`${API_BASE_URL}/stock-items`, {
+
+  create: async (data: { item_name: string; current_weight: number; description: string }): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/stock_items`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      throw new Error('Failed to create stock item');
+    }
     return response.json();
   },
-  
-  update: async (id: number, item: Partial<StockItem>): Promise<StockItem> => {
-    const response = await fetch(`${API_BASE_URL}/stock-items/${id}`, {
+
+  update: async (id: number, data: { item_name?: string; current_weight?: number; description?: string }): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/stock_items/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      throw new Error('Failed to update stock item');
+    }
     return response.json();
   },
-  
-  delete: async (id: number): Promise<{ message: string }> => {
-    const response = await fetch(`${API_BASE_URL}/stock-items/${id}`, {
+
+  delete: async (id: number): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/stock_items/${id}`, {
       method: 'DELETE',
     });
-    return response.json();
-  },
-};
-
-// Transaction API
-export const transactionAPI = {
-  getAll: async (filters?: { start_date?: string; end_date?: string; customer_name?: string }): Promise<Transaction[]> => {
-    const params = new URLSearchParams();
-    if (filters?.start_date) params.append('start_date', filters.start_date);
-    if (filters?.end_date) params.append('end_date', filters.end_date);
-    if (filters?.customer_name) params.append('customer_name', filters.customer_name);
-    
-    const response = await fetch(`${API_BASE_URL}/transactions?${params.toString()}`);
-    return response.json();
-  },
-  
-  getById: async (id: number): Promise<Transaction> => {
-    const response = await fetch(`${API_BASE_URL}/transactions/${id}`);
-    return response.json();
-  },
-  
-  exportCSV: async (filters?: { start_date?: string; end_date?: string; customer_name?: string }) => {
-    const params = new URLSearchParams();
-    if (filters?.start_date) params.append('start_date', filters.start_date);
-    if (filters?.end_date) params.append('end_date', filters.end_date);
-    if (filters?.customer_name) params.append('customer_name', filters.customer_name);
-    
-    const response = await fetch(`${API_BASE_URL}/transactions/export/csv?${params.toString()}`);
-    return response.json();
-  },
-  
-  exportPDF: async (filters?: { start_date?: string; end_date?: string; customer_name?: string }) => {
-    const params = new URLSearchParams();
-    if (filters?.start_date) params.append('start_date', filters.start_date);
-    if (filters?.end_date) params.append('end_date', filters.end_date);
-    if (filters?.customer_name) params.append('customer_name', filters.customer_name);
-    
-    const response = await fetch(`${API_BASE_URL}/transactions/export/pdf?${params.toString()}`);
-    return response.json();
-  },
-};
-
-// Enhanced Stock API
-export const stockAPI = {
-  getCurrent: async (): Promise<{ current_stock: number }> => {
-    const response = await fetch(`${API_BASE_URL}/stock`);
-    return response.json();
-  },
-  
-  addTransaction: async (amount: number, type: "add" | "deduct", item_name: string, description: string): Promise<{ message: string; new_stock: number }> => {
-    const response = await fetch(`${API_BASE_URL}/stock/transaction`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, transaction_type: type, item_name, description }),
-    });
-    return response.json();
-  },
-  
-  getHistory: async (): Promise<Stock[]> => {
-    const response = await fetch(`${API_BASE_URL}/stock/history`);
-    return response.json();
-  },
-};
-
-// Enhanced Expense API
-export const expenseAPI = {
-  getAll: async (): Promise<Expense[]> => {
-    const response = await fetch(`${API_BASE_URL}/expenses`);
-    return response.json();
-  },
-  
-  getDashboard: async (): Promise<ExpenseDashboard> => {
-    const response = await fetch(`${API_BASE_URL}/expenses/dashboard`);
-    return response.json();
-  },
-  
-  create: async (expense: Omit<Expense, 'id' | 'created_at' | 'updated_at'>): Promise<Expense> => {
-    const response = await fetch(`${API_BASE_URL}/expenses`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(expense),
-    });
-    return response.json();
-  },
-  
-  update: async (id: number, expense: Partial<Expense>): Promise<Expense> => {
-    const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(expense),
-    });
-    return response.json();
-  },
-};
-
-// Settings API
-export const settingsAPI = {
-  downloadBackup: async () => {
-    const response = await fetch(`${API_BASE_URL}/settings/backup`);
-    if (response.ok) {
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `metalic_backup_${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      return { message: 'Backup downloaded successfully' };
+    if (!response.ok) {
+      throw new Error('Failed to delete stock item');
     }
-    throw new Error('Failed to download backup');
   },
-  
-  uploadBackup: async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await fetch(`${API_BASE_URL}/settings/restore`, {
-      method: 'POST',
-      body: formData,
-    });
-    return response.json();
-  },
-  
-  getFirmSettings: async (): Promise<FirmSettings> => {
+};
+
+export const settingsAPI = {
+  getFirmSettings: async (): Promise<any> => {
     const response = await fetch(`${API_BASE_URL}/settings/firm`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch firm settings');
+    }
     return response.json();
   },
-  
-  updateFirmSettings: async (settings: Partial<FirmSettings>): Promise<FirmSettings> => {
+
+  updateFirmSettings: async (data: any): Promise<any> => {
     const response = await fetch(`${API_BASE_URL}/settings/firm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    });
-    return response.json();
-  },
-};
-
-// Employee API
-export const employeeAPI = {
-  getAll: async (): Promise<Employee[]> => {
-    const response = await fetch(`${API_BASE_URL}/employees`);
-    return response.json();
-  },
-  
-  create: async (employee: Omit<Employee, 'id' | 'calculated_salary' | 'remaining_amount' | 'created_at' | 'updated_at'>): Promise<Employee> => {
-    const response = await fetch(`${API_BASE_URL}/employees`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(employee),
-    });
-    return response.json();
-  },
-  
-  update: async (id: number, employee: Partial<Employee>): Promise<Employee> => {
-    const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(employee),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     });
-    return response.json();
-  },
-  
-  getById: async (id: number): Promise<Employee> => {
-    const response = await fetch(`${API_BASE_URL}/employees/${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to update firm settings');
+    }
     return response.json();
   },
 };
 
-// Employee Payment API
-export const employeePaymentAPI = {
-  getAll: async (): Promise<EmployeePayment[]> => {
-    const response = await fetch(`${API_BASE_URL}/employee-payments`);
+export const transactionAPI = {
+  getAll: async (params?: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.customer_name) queryParams.append('customer_name', params.customer_name);
+    
+    const response = await fetch(`${API_BASE_URL}/transactions?${queryParams}`);
+    if (!response.ok) throw new Error('Failed to fetch transactions');
     return response.json();
   },
-  
-  getByEmployeeId: async (employeeId: number): Promise<EmployeePayment[]> => {
-    const response = await fetch(`${API_BASE_URL}/employee-payments/employee/${employeeId}`);
-    return response.json();
-  },
-  
-  create: async (payment: Omit<EmployeePayment, 'id' | 'employee_name' | 'created_at' | 'updated_at'>): Promise<EmployeePayment> => {
-    const response = await fetch(`${API_BASE_URL}/employee-payments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payment),
+
+  update: async (id: number, data: any) => {
+    const response = await fetch(`${API_BASE_URL}/transactions/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     });
+    if (!response.ok) throw new Error('Failed to update transaction');
     return response.json();
+  },
+
+  exportCSV: async (params?: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.customer_name) queryParams.append('customer_name', params.customer_name);
+    
+    const response = await fetch(`${API_BASE_URL}/transactions/export/csv?${queryParams}`);
+    if (!response.ok) throw new Error('Failed to export CSV');
+    return response.blob();
+  },
+
+  exportPDF: async (params?: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.customer_name) queryParams.append('customer_name', params.customer_name);
+    
+    const response = await fetch(`${API_BASE_URL}/transactions/export/pdf?${queryParams}`);
+    if (!response.ok) throw new Error('Failed to export PDF');
+    return response.blob();
   },
 };
