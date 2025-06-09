@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Users, Plus, Search, History, DollarSign } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { employeeAPI, employeePaymentAPI, employeeSalaryAPI } from "@/services/api";
+import { employeeAPI, employeePaymentAPI, employeeSalaryAPI, Employee, EmployeePayment, EmployeeSalary } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -31,7 +31,7 @@ const EmployeesPage = () => {
   const [totalDays, setTotalDays] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDescription, setPaymentDescription] = useState("");
-  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [showSalaryHistory, setShowSalaryHistory] = useState(false);
@@ -53,23 +53,23 @@ const EmployeesPage = () => {
 
   const { data: employeePayments = [] } = useQuery({
     queryKey: ['employeePayments', selectedEmployee?.id],
-    queryFn: () => employeePaymentAPI.getByEmployeeId(selectedEmployee?.id),
+    queryFn: () => employeePaymentAPI.getByEmployeeId(selectedEmployee?.id || 0),
     enabled: !!selectedEmployee,
   });
 
   const { data: selectedEmployeeSalaries = [] } = useQuery({
     queryKey: ['employeeSalaries', selectedEmployee?.id],
-    queryFn: () => employeeSalaryAPI.getByEmployeeId(selectedEmployee?.id),
+    queryFn: () => employeeSalaryAPI.getByEmployeeId(selectedEmployee?.id || 0),
     enabled: !!selectedEmployee,
   });
 
-  const filteredEmployees = employees.filter((employee: any) => 
+  const filteredEmployees = (employees as Employee[]).filter((employee: Employee) => 
     employee.name.toLowerCase().includes(nameFilter.toLowerCase()) &&
     (positionFilter === "all" || employee.position.toLowerCase().includes(positionFilter.toLowerCase()))
   );
 
-  const uniqueEmployeeNames = [...new Set(employees.map((emp: any) => emp.name))];
-  const uniquePositions = [...new Set(employees.map((emp: any) => emp.position))];
+  const uniqueEmployeeNames = [...new Set((employees as Employee[]).map((emp: Employee) => emp.name))];
+  const uniquePositions = [...new Set((employees as Employee[]).map((emp: Employee) => emp.position))];
 
   const createEmployeeMutation = useMutation({
     mutationFn: employeeAPI.create,
@@ -171,15 +171,18 @@ const EmployeesPage = () => {
       createEmployeeMutation.mutate({
         name: employeeName,
         position: position,
+        monthly_salary: 0,
+        present_days: 0,
+        total_days: 0,
+        paid_amount: 0,
       });
     }
 
     // Find or create employee and add salary
-    let employeeId;
     if (selectedEmployeeName === "new") {
       // Wait for employee creation then add salary
       setTimeout(() => {
-        const newEmployee = employees.find((emp: any) => emp.name === employeeName);
+        const newEmployee = (employees as Employee[]).find((emp: Employee) => emp.name === employeeName);
         if (newEmployee) {
           createEmployeeSalaryMutation.mutate({
             employee_id: newEmployee.id,
@@ -192,7 +195,7 @@ const EmployeesPage = () => {
         }
       }, 1000);
     } else {
-      const existingEmployee = employees.find((emp: any) => emp.name === selectedEmployeeName);
+      const existingEmployee = (employees as Employee[]).find((emp: Employee) => emp.name === selectedEmployeeName);
       if (existingEmployee) {
         createEmployeeSalaryMutation.mutate({
           employee_id: existingEmployee.id,
@@ -208,7 +211,7 @@ const EmployeesPage = () => {
 
   const handlePayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentAmount) {
+    if (!paymentAmount || !selectedEmployee) {
       toast({
         title: "Error",
         description: "Please enter a valid amount.",
@@ -229,7 +232,7 @@ const EmployeesPage = () => {
     setSelectedEmployeeName(value);
     
     if (value !== "new" && value !== "") {
-      const employee = employees.find((emp: any) => emp.name === value);
+      const employee = (employees as Employee[]).find((emp: Employee) => emp.name === value);
       if (employee) {
         setPosition(employee.position);
       }
@@ -420,15 +423,15 @@ const EmployeesPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.map((employee: any) => (
+                  {filteredEmployees.map((employee: Employee) => (
                     <TableRow key={employee.id} className="hover:bg-gray-50 border-b border-gray-100">
                       <TableCell className="text-gray-700">{employee.name}</TableCell>
                       <TableCell className="text-gray-700">{employee.position}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.total_calculated_salary}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.total_paid_amount}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.total_calculated_salary || 0}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.total_paid_amount || 0}</TableCell>
                       <TableCell className="text-gray-700">
-                        <Badge variant={employee.remaining_amount > 0 ? "destructive" : "default"}>
-                          ₹{employee.remaining_amount}
+                        <Badge variant={(employee.remaining_amount || 0) > 0 ? "destructive" : "default"}>
+                          ₹{employee.remaining_amount || 0}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -522,7 +525,7 @@ const EmployeesPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employeePayments.map((payment: any) => (
+                {(employeePayments as EmployeePayment[]).map((payment: EmployeePayment) => (
                   <TableRow key={payment.id}>
                     <TableCell>₹{payment.amount}</TableCell>
                     <TableCell>{format(new Date(payment.payment_date), 'dd/MM/yyyy')}</TableCell>
@@ -531,7 +534,7 @@ const EmployeesPage = () => {
                 ))}
               </TableBody>
             </Table>
-            {employeePayments.length === 0 && (
+            {(employeePayments as EmployeePayment[]).length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 No payment history found
               </div>
@@ -558,7 +561,7 @@ const EmployeesPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {selectedEmployeeSalaries.map((salary: any) => (
+                {(selectedEmployeeSalaries as EmployeeSalary[]).map((salary: EmployeeSalary) => (
                   <TableRow key={salary.id}>
                     <TableCell>{salary.month}</TableCell>
                     <TableCell>{salary.year}</TableCell>
@@ -570,7 +573,7 @@ const EmployeesPage = () => {
                 ))}
               </TableBody>
             </Table>
-            {selectedEmployeeSalaries.length === 0 && (
+            {(selectedEmployeeSalaries as EmployeeSalary[]).length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 No salary history found
               </div>
