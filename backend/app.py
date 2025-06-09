@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from datetime import datetime, date
@@ -5,6 +6,7 @@ import os
 from models import db, Customer, Bill, Transaction, Employee, EmployeePayment, StockItem, Stock, Expense, FirmSettings
 from flask import send_from_directory
 from utils import backup_database, restore_database
+from routes import api_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -19,6 +21,9 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
 db.init_app(app)
+
+# Register blueprint
+app.register_blueprint(api_bp, url_prefix='/api')
 
 with app.app_context():
     db.create_all()
@@ -92,6 +97,7 @@ def create_bill():
     
     bill = Bill.create(
         customer_id=data['customer_id'],
+        item_name=data['item_name'],
         item=data['item'],
         weight=weight,
         tunch=tunch,
@@ -112,7 +118,7 @@ def create_bill():
         customer_id=bill.customer_id,
         amount=bill.total_amount,
         transaction_type=bill.payment_type,
-        description=f"Bill #{bill.bill_number} - {bill.item}"
+        description=f"Bill #{bill.bill_number} - {bill.item_name}"
     )
     
     # Update stock based on payment type
@@ -129,6 +135,8 @@ def get_bill(bill_id):
     if bill:
         return jsonify(bill.to_dict())
     return jsonify({'message': 'Bill not found'}), 404
+
+# ... keep existing code (stock routes)
 
 # Stock routes
 @app.route('/api/stock', methods=['GET'])
@@ -158,18 +166,18 @@ def get_stock_history():
     return jsonify([stock.to_dict() for stock in stock_history])
 
 # Stock Item routes
-@app.route('/api/stock-items', methods=['GET'])
+@app.route('/api/stock_items', methods=['GET'])
 def get_stock_items():
     stock_items = StockItem.get_all()
     return jsonify([item.to_dict() for item in stock_items])
 
-@app.route('/api/stock-items', methods=['POST'])
+@app.route('/api/stock_items', methods=['POST'])
 def create_stock_item():
     data = request.get_json()
     item = StockItem.create(item_name=data['item_name'], current_weight=data.get('current_weight', 0.0), description=data.get('description', ''))
     return jsonify(item.to_dict()), 201
 
-@app.route('/api/stock-items/<int:item_id>', methods=['PUT'])
+@app.route('/api/stock_items/<int:item_id>', methods=['PUT'])
 def update_stock_item(item_id):
     data = request.get_json()
     item = StockItem.get_by_id(item_id)
@@ -183,7 +191,7 @@ def update_stock_item(item_id):
     db.session.commit()
     return jsonify(item.to_dict())
 
-@app.route('/api/stock-items/<int:item_id>', methods=['DELETE'])
+@app.route('/api/stock_items/<int:item_id>', methods=['DELETE'])
 def delete_stock_item(item_id):
     item = StockItem.get_by_id(item_id)
     if not item:
@@ -209,6 +217,8 @@ def get_transaction(transaction_id):
     if transaction:
         return jsonify(transaction.to_dict())
     return jsonify({'message': 'Transaction not found'}), 404
+
+# ... keep existing code (expense routes, employee routes, settings routes)
 
 # Expense routes
 @app.route('/api/expenses', methods=['GET'])
@@ -301,17 +311,17 @@ def update_employee(employee_id):
     return jsonify({'message': 'Employee not found'}), 404
 
 # Employee Payment routes
-@app.route('/api/employee-payments', methods=['GET'])
+@app.route('/api/employee_payments', methods=['GET'])
 def get_employee_payments():
     payments = EmployeePayment.get_all()
     return jsonify([payment.to_dict() for payment in payments])
 
-@app.route('/api/employee-payments/employee/<int:employee_id>', methods=['GET'])
+@app.route('/api/employee_payments/employee/<int:employee_id>', methods=['GET'])
 def get_employee_payments_by_employee(employee_id):
     payments = EmployeePayment.get_by_employee_id(employee_id)
     return jsonify([payment.to_dict() for payment in payments])
 
-@app.route('/api/employee-payments', methods=['POST'])
+@app.route('/api/employee_payments', methods=['POST'])
 def create_employee_payment():
     data = request.get_json()
     payment = EmployeePayment.create(

@@ -1,20 +1,27 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Users, TrendingUp, TrendingDown, Scale } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, Users, Scale, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { customerAPI } from "@/services/api";
 
 const PendingListPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedCustomer, setExpandedCustomer] = useState<number | null>(null);
 
   const { data: pendingCustomers = [], isLoading } = useQuery({
     queryKey: ['pendingCustomers'],
     queryFn: customerAPI.getPendingList,
+  });
+
+  const { data: customerBills } = useQuery({
+    queryKey: ['customerBills', expandedCustomer],
+    queryFn: () => expandedCustomer ? customerAPI.getCustomerBills(expandedCustomer) : Promise.resolve([]),
+    enabled: !!expandedCustomer,
   });
 
   const filteredPendingCustomers = pendingCustomers.filter(customer =>
@@ -24,6 +31,10 @@ const PendingListPage = () => {
 
   const totalPendingFine = pendingCustomers.reduce((sum, customer) => sum + customer.pending_fine, 0);
   const totalPendingAmount = pendingCustomers.reduce((sum, customer) => sum + customer.pending_amount, 0);
+
+  const toggleExpanded = (customerId: number) => {
+    setExpandedCustomer(expandedCustomer === customerId ? null : customerId);
+  };
 
   if (isLoading) {
     return (
@@ -110,6 +121,7 @@ const PendingListPage = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead></TableHead>
                     <TableHead>Customer Name</TableHead>
                     <TableHead>Mobile</TableHead>
                     <TableHead>Address</TableHead>
@@ -119,40 +131,89 @@ const PendingListPage = () => {
                     <TableHead>Credit Amount</TableHead>
                     <TableHead>Debit Fine (g)</TableHead>
                     <TableHead>Debit Amount</TableHead>
-                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredPendingCustomers.map((customer) => (
-                    <TableRow key={customer.customer_id}>
-                      <TableCell className="font-medium">{customer.customer_name}</TableCell>
-                      <TableCell>{customer.customer_mobile}</TableCell>
-                      <TableCell className="max-w-xs truncate">{customer.customer_address}</TableCell>
-                      <TableCell className={customer.pending_fine > 0 ? "text-red-600 font-semibold" : customer.pending_fine < 0 ? "text-green-600 font-semibold" : ""}>
-                        {customer.pending_fine.toFixed(4)}
-                      </TableCell>
-                      <TableCell className={customer.pending_amount > 0 ? "text-red-600 font-semibold" : customer.pending_amount < 0 ? "text-green-600 font-semibold" : ""}>
-                        ₹{customer.pending_amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell>{customer.total_credit_fine.toFixed(4)}</TableCell>
-                      <TableCell>₹{customer.total_credit_amount.toFixed(2)}</TableCell>
-                      <TableCell>{customer.total_debit_fine.toFixed(4)}</TableCell>
-                      <TableCell>₹{customer.total_debit_amount.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {customer.pending_fine !== 0 && (
-                            <Badge variant={customer.pending_fine > 0 ? "destructive" : "default"}>
-                              {customer.pending_fine > 0 ? "Fine Due" : "Fine Extra"}
-                            </Badge>
-                          )}
-                          {customer.pending_amount !== 0 && (
-                            <Badge variant={customer.pending_amount > 0 ? "destructive" : "default"}>
-                              {customer.pending_amount > 0 ? "Amount Due" : "Amount Extra"}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <Collapsible
+                      key={customer.customer_id}
+                      open={expandedCustomer === customer.customer_id}
+                      onOpenChange={() => toggleExpanded(customer.customer_id)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <TableRow className="cursor-pointer hover:bg-gray-50">
+                          <TableCell>
+                            {expandedCustomer === customer.customer_id ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{customer.customer_name}</TableCell>
+                          <TableCell>{customer.customer_mobile}</TableCell>
+                          <TableCell className="max-w-xs truncate">{customer.customer_address}</TableCell>
+                          <TableCell className={customer.pending_fine > 0 ? "text-red-600 font-semibold" : customer.pending_fine < 0 ? "text-green-600 font-semibold" : ""}>
+                            {customer.pending_fine.toFixed(4)}
+                          </TableCell>
+                          <TableCell className={customer.pending_amount > 0 ? "text-red-600 font-semibold" : customer.pending_amount < 0 ? "text-green-600 font-semibold" : ""}>
+                            ₹{customer.pending_amount.toFixed(2)}
+                          </TableCell>
+                          <TableCell>{customer.total_credit_fine.toFixed(4)}</TableCell>
+                          <TableCell>₹{customer.total_credit_amount.toFixed(2)}</TableCell>
+                          <TableCell>{customer.total_debit_fine.toFixed(4)}</TableCell>
+                          <TableCell>₹{customer.total_debit_amount.toFixed(2)}</TableCell>
+                        </TableRow>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent asChild>
+                        <TableRow>
+                          <TableCell colSpan={10} className="p-0">
+                            <div className="p-4 bg-gray-50 border-t">
+                              <h4 className="font-semibold mb-3">Customer Bills</h4>
+                              {customerBills && customerBills.length > 0 ? (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Bill Number</TableHead>
+                                      <TableHead>Item Name</TableHead>
+                                      <TableHead>Weight</TableHead>
+                                      <TableHead>Tunch</TableHead>
+                                      <TableHead>Wastage</TableHead>
+                                      <TableHead>Wages</TableHead>
+                                      <TableHead>Total Fine</TableHead>
+                                      <TableHead>Total Amount</TableHead>
+                                      <TableHead>Type</TableHead>
+                                      <TableHead>Date</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {customerBills.map((bill) => (
+                                      <TableRow key={bill.id}>
+                                        <TableCell>{bill.bill_number}</TableCell>
+                                        <TableCell>{bill.item_name}</TableCell>
+                                        <TableCell>{bill.weight}g</TableCell>
+                                        <TableCell>{bill.tunch}%</TableCell>
+                                        <TableCell>{bill.wastage}%</TableCell>
+                                        <TableCell>₹{bill.wages}</TableCell>
+                                        <TableCell>{bill.total_fine.toFixed(4)}g</TableCell>
+                                        <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
+                                        <TableCell>
+                                          <Badge variant={bill.payment_type === 'credit' ? 'default' : 'secondary'}>
+                                            {bill.payment_type}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell>{bill.date}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              ) : (
+                                <p className="text-gray-500">No bills found for this customer</p>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </CollapsibleContent>
+                    </Collapsible>
                   ))}
                 </TableBody>
               </Table>

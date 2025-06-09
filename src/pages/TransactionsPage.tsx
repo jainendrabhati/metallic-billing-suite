@@ -7,9 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Download, FileText, Eye, Printer, Edit } from "lucide-react";
+import { Calendar, Download, FileText, Eye, Printer, Edit, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { transactionAPI } from "@/services/api";
+import { transactionAPI, billAPI } from "@/services/api";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,7 +31,31 @@ const TransactionsPage = () => {
   });
 
   const updateTransactionMutation = useMutation({
-    mutationFn: (data: { id: number; updates: any }) => transactionAPI.update(data.id, data.updates),
+    mutationFn: (data: { id: number; updates: any }) => {
+      // If updating bill fields, update the bill instead
+      if (data.updates.weight || data.updates.tunch || data.updates.wastage || data.updates.wages || data.updates.silver_amount || data.updates.payment_type || data.updates.item || data.updates.item_name) {
+        // Calculate new totals
+        const weight = data.updates.weight || editTransaction.weight;
+        const tunch = data.updates.tunch || editTransaction.tunch;
+        const wastage = data.updates.wastage || editTransaction.wastage;
+        const wages = data.updates.wages || editTransaction.wages;
+        const silverAmount = data.updates.silver_amount || editTransaction.silver_amount;
+        const paymentType = data.updates.payment_type || editTransaction.payment_type;
+        
+        const totalFine = weight * ((tunch - wastage) / 100);
+        const totalAmount = (weight * (wages / 1000)) + (paymentType === 'credit' ? silverAmount : 0);
+        
+        const billUpdates = {
+          ...data.updates,
+          total_fine: totalFine,
+          total_amount: totalAmount,
+        };
+        
+        return billAPI.update(editTransaction.bill_id, billUpdates);
+      } else {
+        return transactionAPI.update(data.id, data.updates);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast({
@@ -45,6 +69,30 @@ const TransactionsPage = () => {
       toast({
         title: "Error",
         description: "Failed to update transaction.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: (data: { transactionId: number; billId?: number }) => {
+      if (data.billId) {
+        return billAPI.delete(data.billId);
+      } else {
+        return transactionAPI.delete(data.transactionId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction.",
         variant: "destructive",
       });
     },
@@ -87,25 +135,69 @@ const TransactionsPage = () => {
   const handleEditTransaction = (transaction: any) => {
     setEditTransaction({
       id: transaction.id,
+      bill_id: transaction.bill_id,
       amount: transaction.amount,
       transaction_type: transaction.transaction_type,
-      description: transaction.description
+      description: transaction.description,
+      weight: transaction.weight || 0,
+      tunch: transaction.tunch || 0,
+      wastage: transaction.wastage || 0,
+      wages: transaction.wages || 0,
+      silver_amount: transaction.silver_amount || 0,
+      payment_type: transaction.transaction_type,
+      item: transaction.item || '',
+      item_name: transaction.item_name || '',
     });
     setShowEditDialog(true);
   };
 
-  const handleUpdateTransaction = () => {
-    if (editTransaction) {
-      updateTransactionMutation.mutate({
-        id: editTransaction.id,
-        updates: {
-          amount: parseFloat(editTransaction.amount),
-          transaction_type: editTransaction.transaction_type,
-          description: editTransaction.description
-        }
+  const handleDeleteTransaction = (transaction: any) => {
+    if (confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
+      deleteTransactionMutation.mutate({
+        transactionId: transaction.id,
+        billId: transaction.bill_id
       });
     }
   };
+
+  const handleUpdateTransaction = () => {
+    if (editTransaction) {
+      const updates: any = {};
+      
+      // Include all editable fields
+      if (editTransaction.weight) updates.weight = parseFloat(editTransaction.weight);
+      if (editTransaction.tunch) updates.tunch = parseFloat(editTransaction.tunch);
+      if (editTransaction.wastage) updates.wastage = parseFloat(editTransaction.wastage);
+      if (editTransaction.wages) updates.wages = parseFloat(editTransaction.wages);
+      if (editTransaction.silver_amount) updates.silver_amount = parseFloat(editTransaction.silver_amount);
+      if (editTransaction.payment_type) updates.payment_type = editTransaction.payment_type;
+      if (editTransaction.item) updates.item = editTransaction.item;
+      if (editTransaction.item_name) updates.item_name = editTransaction.item_name;
+      if (editTransaction.description) updates.description = editTransaction.description;
+      
+      updateTransactionMutation.mutate({
+        id: editTransaction.id,
+        updates
+      });
+    }
+  };
+
+  const calculateTotals = () => {
+    if (!editTransaction) return { totalFine: 0, totalAmount: 0 };
+    
+    const weight = parseFloat(editTransaction.weight) || 0;
+    const tunch = parseFloat(editTransaction.tunch) || 0;
+    const wastage = parseFloat(editTransaction.wastage) || 0;
+    const wages = parseFloat(editTransaction.wages) || 0;
+    const silverAmount = parseFloat(editTransaction.silver_amount) || 0;
+    
+    const totalFine = weight * ((tunch - wastage) / 100);
+    const totalAmount = (weight * (wages / 1000)) + (editTransaction.payment_type === 'credit' ? silverAmount : 0);
+    
+    return { totalFine, totalAmount };
+  };
+
+  const { totalFine, totalAmount } = calculateTotals();
 
   const handlePrintTransaction = (transaction: any) => {
     const printContent = `
@@ -259,6 +351,13 @@ const TransactionsPage = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
+                          onClick={() => handleDeleteTransaction(transaction)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
                           onClick={() => handlePrintTransaction(transaction)}
                         >
                           <Printer className="h-4 w-4" />
@@ -280,37 +379,107 @@ const TransactionsPage = () => {
 
       {/* Edit Transaction Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Transaction</DialogTitle>
           </DialogHeader>
           {editTransaction && (
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="editAmount">Amount</Label>
-                <Input
-                  id="editAmount"
-                  type="number"
-                  step="0.01"
-                  value={editTransaction.amount}
-                  onChange={(e) => setEditTransaction({...editTransaction, amount: e.target.value})}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editItemName">Item Name</Label>
+                  <Input
+                    id="editItemName"
+                    value={editTransaction.item_name}
+                    onChange={(e) => setEditTransaction({...editTransaction, item_name: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editItem">Item Type</Label>
+                  <Input
+                    id="editItem"
+                    value={editTransaction.item}
+                    onChange={(e) => setEditTransaction({...editTransaction, item: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editWeight">Weight (grams)</Label>
+                  <Input
+                    id="editWeight"
+                    type="number"
+                    step="0.001"
+                    value={editTransaction.weight}
+                    onChange={(e) => setEditTransaction({...editTransaction, weight: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editTunch">Tunch (%)</Label>
+                  <Input
+                    id="editTunch"
+                    type="number"
+                    step="0.01"
+                    value={editTransaction.tunch}
+                    onChange={(e) => setEditTransaction({...editTransaction, tunch: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editWastage">Wastage (%)</Label>
+                  <Input
+                    id="editWastage"
+                    type="number"
+                    step="0.01"
+                    value={editTransaction.wastage}
+                    onChange={(e) => setEditTransaction({...editTransaction, wastage: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editWages">Wages (per 1000)</Label>
+                  <Input
+                    id="editWages"
+                    type="number"
+                    step="0.01"
+                    value={editTransaction.wages}
+                    onChange={(e) => setEditTransaction({...editTransaction, wages: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editSilverAmount">Silver Amount</Label>
+                  <Input
+                    id="editSilverAmount"
+                    type="number"
+                    step="0.01"
+                    value={editTransaction.silver_amount}
+                    onChange={(e) => setEditTransaction({...editTransaction, silver_amount: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editType">Bill Type</Label>
+                  <Select 
+                    value={editTransaction.payment_type} 
+                    onValueChange={(value) => setEditTransaction({...editTransaction, payment_type: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="credit">Credit</SelectItem>
+                      <SelectItem value="debit">Debit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="editType">Transaction Type</Label>
-                <Select 
-                  value={editTransaction.transaction_type} 
-                  onValueChange={(value) => setEditTransaction({...editTransaction, transaction_type: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="credit">Credit</SelectItem>
-                    <SelectItem value="debit">Debit</SelectItem>
-                  </SelectContent>
-                </Select>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-md">
+                <div>
+                  <Label>Calculated Total Fine</Label>
+                  <div className="text-lg font-semibold">{totalFine.toFixed(4)}g</div>
+                </div>
+                <div>
+                  <Label>Calculated Total Amount</Label>
+                  <div className="text-lg font-semibold">₹{totalAmount.toFixed(2)}</div>
+                </div>
               </div>
+              
               <div>
                 <Label htmlFor="editDescription">Description</Label>
                 <Textarea
@@ -341,6 +510,7 @@ const TransactionsPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* View Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>

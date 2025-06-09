@@ -56,7 +56,9 @@ export interface Employee {
   monthly_salary: number;
   present_days: number;
   total_days: number;
+  calculated_salary: number;
   paid_amount: number;
+  remaining_amount: number;
   created_at: string;
   updated_at: string;
 }
@@ -117,6 +119,14 @@ export const customerAPI = {
     }
     return response.json();
   },
+
+  getCustomerBills: async (customerId: number): Promise<Bill[]> => {
+    const response = await fetch(`${API_BASE_URL}/customers/${customerId}/bills`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch customer bills');
+    }
+    return response.json();
+  },
 };
 
 export const billAPI = {
@@ -159,6 +169,29 @@ export const billAPI = {
       throw new Error('Failed to create bill');
     }
     return response.json();
+  },
+
+  update: async (id: number, data: Partial<Bill>): Promise<Bill> => {
+    const response = await fetch(`${API_BASE_URL}/bills/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update bill');
+    }
+    return response.json();
+  },
+
+  delete: async (id: number): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/bills/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete bill');
+    }
   },
 
   getByCustomer: async (customerId: number): Promise<Bill[]> => {
@@ -222,6 +255,36 @@ export const stockAPI = {
     const response = await fetch(`${API_BASE_URL}/stock_items`);
     if (!response.ok) {
       throw new Error('Failed to fetch stock items');
+    }
+    return response.json();
+  },
+
+  getCurrent: async (): Promise<{ current_stock: number }> => {
+    const response = await fetch(`${API_BASE_URL}/stock`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch current stock');
+    }
+    return response.json();
+  },
+
+  getHistory: async (): Promise<any[]> => {
+    const response = await fetch(`${API_BASE_URL}/stock/history`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch stock history');
+    }
+    return response.json();
+  },
+
+  addTransaction: async (data: { item_name: string; amount: number; transaction_type: string; description: string }): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/stock/transaction`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to add stock transaction');
     }
     return response.json();
   },
@@ -357,6 +420,14 @@ export const employeePaymentAPI = {
     return response.json();
   },
 
+  getByEmployeeId: async (employeeId: number): Promise<EmployeePayment[]> => {
+    const response = await fetch(`${API_BASE_URL}/employee_payments/employee/${employeeId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch employee payments');
+    }
+    return response.json();
+  },
+
   create: async (data: Omit<EmployeePayment, 'id' | 'created_at' | 'updated_at'>): Promise<EmployeePayment> => {
     const response = await fetch(`${API_BASE_URL}/employee_payments`, {
       method: 'POST',
@@ -439,6 +510,14 @@ export const transactionAPI = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to update transaction');
+    return response.json();
+  },
+
+  delete: async (id: number) => {
+    const response = await fetch(`${API_BASE_URL}/transactions/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete transaction');
     return response.json();
   },
 
