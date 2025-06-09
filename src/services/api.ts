@@ -201,13 +201,15 @@ export const transactionAPI = {
   update: (id: number, transaction: Partial<Transaction>) =>
     api.put(`/transactions/${id}`, transaction).then(res => res.data),
   delete: (id: number) => api.delete(`/transactions/${id}`).then(res => res.data),
-  getFiltered: (startDate: string | null, endDate: string | null, customerName: string | null) => {
+  getFiltered: (startDate?: string, endDate?: string, customerName?: string) => {
     let url = `/transactions/filtered?`;
     if (startDate) url += `start_date=${startDate}&`;
     if (endDate) url += `end_date=${endDate}&`;
     if (customerName) url += `customer_name=${customerName}&`;
     return api.get(url.slice(0, -1)).then(res => res.data);
-  }
+  },
+  exportCSV: () => api.get('/transactions/export/csv').then(res => res.data),
+  exportPDF: () => api.get('/transactions/export/pdf').then(res => res.data)
 };
 
 export const expenseAPI = {
@@ -259,7 +261,7 @@ export const stockItemAPI = {
 export const employeeAPI = {
   getAll: () => api.get('/employees').then(res => res.data),
   getById: (id: number) => api.get(`/employees/${id}`).then(res => res.data),
-  create: (employee: Omit<Employee, 'id' | 'created_at' | 'updated_at' | 'calculated_salary' | 'remaining_amount' | 'total_calculated_salary' | 'total_paid_amount'>) => 
+  create: (employee: { name: string; position: string }) => 
     api.post('/employees', employee).then(res => res.data),
   update: (id: number, employee: Partial<Employee>) => 
     api.put(`/employees/${id}`, employee).then(res => res.data),
