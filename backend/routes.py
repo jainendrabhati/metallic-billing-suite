@@ -175,6 +175,8 @@ def delete_employee_payment(payment_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# Stock Management API Routes
+
 @api_bp.route('/stock', methods=['GET'])
 def get_stock():
     try:
@@ -183,11 +185,19 @@ def get_stock():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@api_bp.route('/stock/current', methods=['GET'])
+def get_current_stock():
+    try:
+        current_stock = Stock.get_current_stock()
+        return jsonify({'current_stock': current_stock}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @api_bp.route('/stock/history', methods=['GET'])
 def get_stock_history():
     try:
-        stock = Stock.get_all()
-        return jsonify([s.to_dict() for s in stock]), 200
+        stock_history = Stock.get_all()
+        return jsonify([s.to_dict() for s in stock_history]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -202,8 +212,10 @@ def add_stock_transaction():
         
         if transaction_type == 'add':
             stock = Stock.add_stock(item_name, amount, description)
-        else:
+        elif transaction_type == 'deduct':
             stock = Stock.deduct_stock(item_name, amount, description)
+        else:
+            return jsonify({'error': 'Invalid transaction type'}), 400
         
         return jsonify(stock.to_dict()), 201
     except Exception as e:
@@ -224,14 +236,6 @@ def deduct_stock():
         data = request.get_json()
         stock = Stock.deduct_stock(data['item_name'], data['amount'], data.get('description', "Stock deducted"))
         return jsonify(stock.to_dict()), 201
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@api_bp.route('/stock/current', methods=['GET'])
-def get_current_stock():
-    try:
-        current_stock = Stock.get_current_stock()
-        return jsonify({'current_stock': current_stock}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

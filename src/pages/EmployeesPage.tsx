@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,8 +20,8 @@ const MONTHS = [
 ];
 
 const EmployeesPage = () => {
-  const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
-  const [newEmployeeName, setNewEmployeeName] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [position, setPosition] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
@@ -37,6 +36,7 @@ const EmployeesPage = () => {
   const [showSalaryHistory, setShowSalaryHistory] = useState(false);
   const [nameFilter, setNameFilter] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
+  const [isNewEmployee, setIsNewEmployee] = useState(true);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -68,18 +68,28 @@ const EmployeesPage = () => {
     (positionFilter === "all" || employee.position.toLowerCase().includes(positionFilter.toLowerCase()))
   );
 
-  const uniqueEmployeeNames = [...new Set((employees as Employee[]).map((emp: Employee) => emp.name))];
   const uniquePositions = [...new Set((employees as Employee[]).map((emp: Employee) => emp.position))];
 
   const createEmployeeMutation = useMutation({
     mutationFn: employeeAPI.create,
-    onSuccess: () => {
+    onSuccess: (newEmployee) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast({
         title: "Success",
         description: "Employee added successfully!",
       });
-      resetForm();
+      
+      // Now create the salary record for the new employee
+      if (selectedMonth && monthlySalary && presentDays && totalDays) {
+        createEmployeeSalaryMutation.mutate({
+          employee_id: newEmployee.id,
+          month: selectedMonth,
+          year: parseInt(selectedYear),
+          monthly_salary: parseFloat(monthlySalary),
+          present_days: parseInt(presentDays),
+          total_days: parseInt(totalDays),
+        });
+      }
     },
     onError: () => {
       toast({
@@ -133,22 +143,21 @@ const EmployeesPage = () => {
   });
 
   const resetForm = () => {
-    setSelectedEmployeeName("");
-    setNewEmployeeName("");
+    setEmployeeName("");
+    setSelectedEmployeeId("");
     setPosition("");
     setSelectedMonth("");
     setSelectedYear(new Date().getFullYear().toString());
     setMonthlySalary("");
     setPresentDays("");
     setTotalDays("");
+    setIsNewEmployee(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const employeeName = selectedEmployeeName === "new" ? newEmployeeName : selectedEmployeeName;
-    
-    if (!employeeName || !position || !selectedMonth || !monthlySalary || !presentDays || !totalDays) {
+    if (!selectedMonth || !monthlySalary || !presentDays || !totalDays) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -157,8 +166,22 @@ const EmployeesPage = () => {
       return;
     }
 
-    if (selectedEmployeeName === "new") {
-      if (uniqueEmployeeNames.includes(newEmployeeName)) {
+    if (isNewEmployee) {
+      if (!employeeName || !position) {
+        toast({
+          title: "Error",
+          description: "Please enter employee name and position.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if employee already exists
+      const existingEmployee = (employees as Employee[]).find((emp: Employee) => 
+        emp.name.toLowerCase() === employeeName.toLowerCase()
+      );
+      
+      if (existingEmployee) {
         toast({
           title: "Error",
           description: "Employee with this name already exists.",
@@ -167,7 +190,7 @@ const EmployeesPage = () => {
         return;
       }
       
-      // Create new employee first
+      // Create new employee
       createEmployeeMutation.mutate({
         name: employeeName,
         position: position,
@@ -176,36 +199,25 @@ const EmployeesPage = () => {
         total_days: 0,
         paid_amount: 0,
       });
-    }
-
-    // Find or create employee and add salary
-    if (selectedEmployeeName === "new") {
-      // Wait for employee creation then add salary
-      setTimeout(() => {
-        const newEmployee = (employees as Employee[]).find((emp: Employee) => emp.name === employeeName);
-        if (newEmployee) {
-          createEmployeeSalaryMutation.mutate({
-            employee_id: newEmployee.id,
-            month: selectedMonth,
-            year: parseInt(selectedYear),
-            monthly_salary: parseFloat(monthlySalary),
-            present_days: parseInt(presentDays),
-            total_days: parseInt(totalDays),
-          });
-        }
-      }, 1000);
     } else {
-      const existingEmployee = (employees as Employee[]).find((emp: Employee) => emp.name === selectedEmployeeName);
-      if (existingEmployee) {
-        createEmployeeSalaryMutation.mutate({
-          employee_id: existingEmployee.id,
-          month: selectedMonth,
-          year: parseInt(selectedYear),
-          monthly_salary: parseFloat(monthlySalary),
-          present_days: parseInt(presentDays),
-          total_days: parseInt(totalDays),
+      if (!selectedEmployeeId) {
+        toast({
+          title: "Error",
+          description: "Please select an employee.",
+          variant: "destructive",
         });
+        return;
       }
+
+      // Add salary for existing employee
+      createEmployeeSalaryMutation.mutate({
+        employee_id: parseInt(selectedEmployeeId),
+        month: selectedMonth,
+        year: parseInt(selectedYear),
+        monthly_salary: parseFloat(monthlySalary),
+        present_days: parseInt(presentDays),
+        total_days: parseInt(totalDays),
+      });
     }
   };
 
@@ -228,23 +240,17 @@ const EmployeesPage = () => {
     });
   };
 
-  const handleEmployeeNameChange = (value: string) => {
-    setSelectedEmployeeName(value);
+  const handleEmployeeSelection = (value: string) => {
+    setSelectedEmployeeId(value);
     
-    if (value !== "new" && value !== "") {
-      const employee = (employees as Employee[]).find((emp: Employee) => emp.name === value);
+    if (value) {
+      const employee = (employees as Employee[]).find((emp: Employee) => emp.id.toString() === value);
       if (employee) {
         setPosition(employee.position);
       }
     } else {
       setPosition("");
     }
-    
-    // Reset other fields
-    setSelectedMonth("");
-    setMonthlySalary("");
-    setPresentDays("");
-    setTotalDays("");
   };
 
   return (
@@ -267,46 +273,88 @@ const EmployeesPage = () => {
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="employeeName">Employee Name</Label>
-                  <Select value={selectedEmployeeName} onValueChange={handleEmployeeNameChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select existing or add new" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">Add New Employee</SelectItem>
-                      {uniqueEmployeeNames.map((name) => (
-                        <SelectItem key={name} value={name}>{name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {selectedEmployeeName === "new" && (
-                  <div>
-                    <Label htmlFor="newEmployeeName">New Employee Name</Label>
-                    <Input
-                      id="newEmployeeName"
-                      type="text"
-                      value={newEmployeeName}
-                      onChange={(e) => setNewEmployeeName(e.target.value)}
-                      placeholder="Enter new employee name"
-                      className="border-gray-300 focus:border-blue-500"
-                    />
+                <div className="md:col-span-3">
+                  <div className="flex gap-4 mb-4">
+                    <Button
+                      type="button"
+                      variant={isNewEmployee ? "default" : "outline"}
+                      onClick={() => {
+                        setIsNewEmployee(true);
+                        setSelectedEmployeeId("");
+                        setEmployeeName("");
+                        setPosition("");
+                      }}
+                    >
+                      New Employee
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={!isNewEmployee ? "default" : "outline"}
+                      onClick={() => {
+                        setIsNewEmployee(false);
+                        setEmployeeName("");
+                      }}
+                    >
+                      Existing Employee
+                    </Button>
                   </div>
-                )}
-
-                <div>
-                  <Label htmlFor="position">Position</Label>
-                  <Input
-                    id="position"
-                    type="text"
-                    value={position}
-                    onChange={(e) => setPosition(e.target.value)}
-                    placeholder="Enter employee position"
-                    className="border-gray-300 focus:border-blue-500"
-                  />
                 </div>
+
+                {isNewEmployee ? (
+                  <>
+                    <div>
+                      <Label htmlFor="employeeName">Employee Name</Label>
+                      <Input
+                        id="employeeName"
+                        type="text"
+                        value={employeeName}
+                        onChange={(e) => setEmployeeName(e.target.value)}
+                        placeholder="Enter employee name"
+                        className="border-gray-300 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="position">Position</Label>
+                      <Input
+                        id="position"
+                        type="text"
+                        value={position}
+                        onChange={(e) => setPosition(e.target.value)}
+                        placeholder="Enter employee position"
+                        className="border-gray-300 focus:border-blue-500"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <Label htmlFor="existingEmployee">Select Employee</Label>
+                      <Select value={selectedEmployeeId} onValueChange={handleEmployeeSelection}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an employee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(employees as Employee[]).map((employee: Employee) => (
+                            <SelectItem key={employee.id} value={employee.id.toString()}>
+                              {employee.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="position">Position</Label>
+                      <Input
+                        id="position"
+                        type="text"
+                        value={position}
+                        readOnly
+                        placeholder="Position will be filled automatically"
+                        className="border-gray-300 bg-gray-50"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <Label htmlFor="month">Month</Label>
@@ -375,12 +423,13 @@ const EmployeesPage = () => {
                 disabled={createEmployeeMutation.isPending || createEmployeeSalaryMutation.isPending}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Employee Salary
+                {isNewEmployee ? "Add New Employee & Salary" : "Add Employee Salary"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
+        
         <Card className="shadow-lg border-0">
           <CardHeader className="bg-gray-50 border-b">
             <div className="flex items-center justify-between">
