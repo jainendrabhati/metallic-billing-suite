@@ -82,6 +82,43 @@ def get_pending_customers():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@customer_bp.route('/customers/pending-list', methods=['GET'])
+def get_pending_list():
+    try:
+        customers = Customer.get_all()
+        pending_list = []
+        
+        for customer in customers:
+            credit_bills = Bill.query.filter_by(customer_id=customer.id, payment_type='credit').all()
+            debit_bills = Bill.query.filter_by(customer_id=customer.id, payment_type='debit').all()
+            
+            total_credit_fine = sum(bill.total_fine for bill in credit_bills)
+            total_credit_amount = sum(bill.total_amount for bill in credit_bills)
+            
+            total_debit_fine = sum(bill.total_fine for bill in debit_bills)
+            total_debit_amount = sum(bill.total_amount for bill in debit_bills)
+            
+            remaining_fine = total_credit_fine - total_debit_fine
+            remaining_amount = total_credit_amount - total_debit_amount
+            
+            if remaining_fine != 0 or remaining_amount != 0:
+                pending_list.append({
+                    'customer_id': customer.id,
+                    'customer_name': customer.name,
+                    'customer_mobile': customer.mobile,
+                    'customer_address': customer.address,
+                    'remaining_fine': remaining_fine,
+                    'remaining_amount': remaining_amount,
+                    'total_credit_fine': total_credit_fine,
+                    'total_credit_amount': total_credit_amount,
+                    'total_debit_fine': total_debit_fine,
+                    'total_debit_amount': total_debit_amount
+                })
+        
+        return jsonify(pending_list), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @customer_bp.route('/customers/<int:customer_id>/bills', methods=['GET'])
 def get_customer_bills(customer_id):
     try:

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Search, Users, Scale, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
@@ -14,7 +15,7 @@ const PendingListPage = () => {
   const [expandedCustomer, setExpandedCustomer] = useState<number | null>(null);
 
   const { data: pendingCustomers = [], isLoading } = useQuery({
-    queryKey: ['pendingCustomers'],
+    queryKey: ['pendingList'],
     queryFn: customerAPI.getPendingList,
   });
 
@@ -29,8 +30,8 @@ const PendingListPage = () => {
     customer.customer_mobile.includes(searchTerm)
   );
 
-  const totalPendingFine = pendingCustomers.reduce((sum, customer) => sum + customer.pending_fine, 0);
-  const totalPendingAmount = pendingCustomers.reduce((sum, customer) => sum + customer.pending_amount, 0);
+  const totalRemainingFine = pendingCustomers.reduce((sum, customer) => sum + customer.remaining_fine, 0);
+  const totalRemainingAmount = pendingCustomers.reduce((sum, customer) => sum + customer.remaining_amount, 0);
 
   const toggleExpanded = (customerId: number) => {
     setExpandedCustomer(expandedCustomer === customerId ? null : customerId);
@@ -40,7 +41,7 @@ const PendingListPage = () => {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
-          <div className="text-gray-500">Loading pending list...</div>
+          <div className="text-gray-500">Loading pending customers...</div>
         </div>
       </div>
     );
@@ -51,7 +52,7 @@ const PendingListPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Pending List</h1>
-          <p className="text-gray-600">Track outstanding customer balances and fine weights</p>
+          <p className="text-gray-600">Track customers with outstanding balances and fine weights</p>
         </div>
         <div className="relative w-80">
           <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -80,25 +81,25 @@ const PendingListPage = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pending Fine</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Remaining Fine</CardTitle>
             <Scale className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalPendingFine.toFixed(4)}g</div>
+            <div className="text-2xl font-bold">{totalRemainingFine.toFixed(4)}g</div>
             <p className="text-xs text-muted-foreground">
-              Total fine weight pending
+              Total fine weight remaining
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pending Amount</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Remaining Amount</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{totalPendingAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold">₹{totalRemainingAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              Total amount pending
+              Total amount remaining
             </p>
           </CardContent>
         </Card>
@@ -124,13 +125,8 @@ const PendingListPage = () => {
                     <TableHead></TableHead>
                     <TableHead>Customer Name</TableHead>
                     <TableHead>Mobile</TableHead>
-                    <TableHead>Address</TableHead>
-                    <TableHead>Pending Fine (g)</TableHead>
-                    <TableHead>Pending Amount</TableHead>
-                    <TableHead>Credit Fine (g)</TableHead>
-                    <TableHead>Credit Amount</TableHead>
-                    <TableHead>Debit Fine (g)</TableHead>
-                    <TableHead>Debit Amount</TableHead>
+                    <TableHead>Remaining Fine (g)</TableHead>
+                    <TableHead>Remaining Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -143,43 +139,40 @@ const PendingListPage = () => {
                       <CollapsibleTrigger asChild>
                         <TableRow className="cursor-pointer hover:bg-gray-50">
                           <TableCell>
-                            {expandedCustomer === customer.customer_id ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
+                            <Button variant="ghost" size="sm">
+                              {expandedCustomer === customer.customer_id ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
                           </TableCell>
                           <TableCell className="font-medium">{customer.customer_name}</TableCell>
                           <TableCell>{customer.customer_mobile}</TableCell>
-                          <TableCell className="max-w-xs truncate">{customer.customer_address}</TableCell>
-                          <TableCell className={customer.pending_fine > 0 ? "text-red-600 font-semibold" : customer.pending_fine < 0 ? "text-green-600 font-semibold" : ""}>
-                            {customer.pending_fine.toFixed(4)}
+                          <TableCell className={customer.remaining_fine > 0 ? "text-red-600 font-semibold" : customer.remaining_fine < 0 ? "text-green-600 font-semibold" : ""}>
+                            {customer.remaining_fine.toFixed(4)}
                           </TableCell>
-                          <TableCell className={customer.pending_amount > 0 ? "text-red-600 font-semibold" : customer.pending_amount < 0 ? "text-green-600 font-semibold" : ""}>
-                            ₹{customer.pending_amount.toFixed(2)}
+                          <TableCell className={customer.remaining_amount > 0 ? "text-red-600 font-semibold" : customer.remaining_amount < 0 ? "text-green-600 font-semibold" : ""}>
+                            ₹{customer.remaining_amount.toFixed(2)}
                           </TableCell>
-                          <TableCell>{customer.total_credit_fine.toFixed(4)}</TableCell>
-                          <TableCell>₹{customer.total_credit_amount.toFixed(2)}</TableCell>
-                          <TableCell>{customer.total_debit_fine.toFixed(4)}</TableCell>
-                          <TableCell>₹{customer.total_debit_amount.toFixed(2)}</TableCell>
                         </TableRow>
                       </CollapsibleTrigger>
                       <CollapsibleContent asChild>
                         <TableRow>
-                          <TableCell colSpan={10} className="p-0">
+                          <TableCell colSpan={5} className="p-0">
                             <div className="p-4 bg-gray-50 border-t">
-                              <h4 className="font-semibold mb-3">Customer Bills</h4>
+                              <h4 className="font-semibold mb-3 text-gray-900">Customer Bills</h4>
                               {customerBills && customerBills.length > 0 ? (
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
                                       <TableHead>Bill Number</TableHead>
                                       <TableHead>Item Name</TableHead>
-                                      <TableHead>Weight</TableHead>
-                                      <TableHead>Tunch</TableHead>
-                                      <TableHead>Wastage</TableHead>
+                                      <TableHead>Weight (g)</TableHead>
+                                      <TableHead>Tunch (%)</TableHead>
+                                      <TableHead>Wastage (%)</TableHead>
                                       <TableHead>Wages</TableHead>
-                                      <TableHead>Total Fine</TableHead>
+                                      <TableHead>Total Fine (g)</TableHead>
                                       <TableHead>Total Amount</TableHead>
                                       <TableHead>Type</TableHead>
                                       <TableHead>Date</TableHead>
@@ -188,20 +181,20 @@ const PendingListPage = () => {
                                   <TableBody>
                                     {customerBills.map((bill) => (
                                       <TableRow key={bill.id}>
-                                        <TableCell>{bill.bill_number}</TableCell>
+                                        <TableCell className="font-medium">{bill.bill_number}</TableCell>
                                         <TableCell>{bill.item_name}</TableCell>
-                                        <TableCell>{bill.weight}g</TableCell>
-                                        <TableCell>{bill.tunch}%</TableCell>
-                                        <TableCell>{bill.wastage}%</TableCell>
-                                        <TableCell>₹{bill.wages}</TableCell>
-                                        <TableCell>{bill.total_fine.toFixed(4)}g</TableCell>
+                                        <TableCell>{bill.weight.toFixed(4)}</TableCell>
+                                        <TableCell>{bill.tunch.toFixed(2)}</TableCell>
+                                        <TableCell>{bill.wastage.toFixed(2)}</TableCell>
+                                        <TableCell>₹{bill.wages.toFixed(2)}</TableCell>
+                                        <TableCell>{bill.total_fine.toFixed(4)}</TableCell>
                                         <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
                                         <TableCell>
                                           <Badge variant={bill.payment_type === 'credit' ? 'default' : 'secondary'}>
-                                            {bill.payment_type}
+                                            {bill.payment_type.toUpperCase()}
                                           </Badge>
                                         </TableCell>
-                                        <TableCell>{bill.date}</TableCell>
+                                        <TableCell>{new Date(bill.date).toLocaleDateString()}</TableCell>
                                       </TableRow>
                                     ))}
                                   </TableBody>
