@@ -277,16 +277,28 @@ export const transactionAPI = {
     return response.json();
   },
 
-  exportCSV: async () => {
-    const response = await fetch(`${API_BASE_URL}/transactions/export/csv`);
+  exportCSV: async (data: any[]) => {
+    const response = await fetch(`${API_BASE_URL}/transactions/export/csv`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ data }),
+    });
     if (!response.ok) {
       throw new Error("Failed to export CSV");
     }
     return response.json();
   },
 
-  exportPDF: async () => {
-    const response = await fetch(`${API_BASE_URL}/transactions/export/pdf`);
+  exportPDF: async (data: any[]) => {
+    const response = await fetch(`${API_BASE_URL}/transactions/export/pdf`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ data }),
+    });
     if (!response.ok) {
       throw new Error("Failed to export PDF");
     }

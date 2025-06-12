@@ -157,28 +157,30 @@ def backup_database():
             
             print(f"Creating CSV for {model_name} with {len(data)} records")
             
-            # Write CSV with proper headers
+            # Write CSV with proper headers (only actual database columns)
             with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
                 if data:
-                    # Get field names from the first record
-                    first_record = data[0].to_dict()
-                    fieldnames = list(first_record.keys())
+                    # Get only the database column fields
+                    fieldnames = get_model_database_fields(model_name)
                     
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
                     
                     for item in data:
                         item_dict = item.to_dict()
+                        # Filter to only include database fields
+                        filtered_dict = {key: value for key, value in item_dict.items() if key in fieldnames}
+                        
                         # Convert None values to empty strings and handle dates
-                        for key, value in item_dict.items():
+                        for key, value in filtered_dict.items():
                             if value is None:
-                                item_dict[key] = ''
+                                filtered_dict[key] = ''
                             elif hasattr(value, 'isoformat'):  # Handle datetime/date objects
-                                item_dict[key] = value.isoformat()
-                        writer.writerow(item_dict)
+                                filtered_dict[key] = value.isoformat()
+                        writer.writerow(filtered_dict)
                 else:
                     # Create empty CSV with headers
-                    headers = get_model_headers(model_name)
+                    headers = get_model_database_fields(model_name)
                     writer = csv.writer(csvfile)
                     writer.writerow(headers)
         
@@ -193,9 +195,9 @@ def backup_database():
     print(f"Backup created successfully: {zip_filename}")
     return zip_filename
 
-def get_model_headers(model_name):
-    """Get headers for each model"""
-    headers_map = {
+def get_model_database_fields(model_name):
+    """Get only the actual database fields for each model (not computed fields from to_dict)"""
+    fields_map = {
         'customers': ['id', 'name', 'mobile', 'address', 'total_bills', 'created_at', 'updated_at'],
         'bills': ['id', 'bill_number', 'customer_id', 'item_name', 'item', 'weight', 'tunch', 'wages', 'wastage', 'silver_amount', 'total_fine', 'total_amount', 'payment_type', 'slip_no', 'description', 'date', 'created_at', 'updated_at'],
         'transactions': ['id', 'bill_id', 'customer_id', 'amount', 'transaction_type', 'description', 'created_at', 'updated_at'],
@@ -204,10 +206,14 @@ def get_model_headers(model_name):
         'employee_salaries': ['id', 'employee_id', 'month', 'year', 'monthly_salary', 'present_days', 'total_days', 'calculated_salary', 'created_at', 'updated_at'],
         'employee_payments': ['id', 'employee_id', 'amount', 'payment_date', 'description', 'created_at', 'updated_at'],
         'stock_items': ['id', 'item_name', 'current_weight', 'description', 'created_at', 'updated_at'],
-        'stock': ['id', 'amount', 'transaction_type', 'item_name', 'description', 'created_at'],
+        'stock': ['id', 'item_name', 'amount', 'transaction_type', 'description', 'created_at'],
         'firm_settings': ['id', 'firm_name', 'gst_number', 'address', 'logo_path', 'created_at', 'updated_at']
     }
-    return headers_map.get(model_name, [])
+    return fields_map.get(model_name, [])
+
+def get_model_headers(model_name):
+    """Get headers for each model (legacy function, use get_model_database_fields instead)"""
+    return get_model_database_fields(model_name)
 
 def restore_database(zip_file_path):
     """Restore database from uploaded ZIP file containing CSV files"""
@@ -261,11 +267,15 @@ def restore_database(zip_file_path):
                     with open(csv_filepath, 'r', encoding='utf-8') as csvfile:
                         reader = csv.DictReader(csvfile)
                         
+                        # Get only valid database fields for this model
+                        model_name = csv_filename.replace('.csv', '')
+                        valid_fields = get_model_database_fields(model_name)
+                        
                         for row in reader:
-                            # Remove empty values and convert types
+                            # Filter to only include valid database fields and non-empty values
                             data = {}
                             for key, value in row.items():
-                                if value and value.strip():  # Skip empty values
+                                if key in valid_fields and value and value.strip():  # Only valid fields with non-empty values
                                     # Handle date fields
                                     if key in ['date', 'payment_date'] and value:
                                         try:
