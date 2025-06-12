@@ -29,15 +29,22 @@ def update_settings():
 @dashboard_bp.route('/backup/download', methods=['GET'])
 def download_backup():
     try:
+        print("Starting backup process...")
+        
         # Create backup ZIP file
         zip_filename = backup_database()
         zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
         
+        print(f"Backup created: {zip_filepath}")
+        
         # Check if file exists
         if not os.path.exists(zip_filepath):
+            print(f"Backup file not found at: {zip_filepath}")
             return jsonify({'error': 'Backup file not found'}), 404
         
-        # Send file for download
+        print(f"Sending file: {zip_filepath}")
+        
+        # Send file for download with proper headers
         return send_file(
             zip_filepath,
             as_attachment=True,
@@ -45,6 +52,7 @@ def download_backup():
             mimetype='application/zip'
         )
     except Exception as e:
+        print(f"Backup error: {str(e)}")
         return jsonify({'error': f'Backup failed: {str(e)}'}), 500
 
 @dashboard_bp.route('/backup/upload', methods=['POST'])

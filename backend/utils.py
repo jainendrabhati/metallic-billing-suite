@@ -128,8 +128,12 @@ def backup_database():
     zip_filename = f"metalic_backup_{timestamp}.zip"
     zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
     
+    print(f"Creating backup ZIP at: {zip_filepath}")
+    
     # Create a temporary directory for CSV files
     with tempfile.TemporaryDirectory() as temp_dir:
+        print(f"Using temp directory: {temp_dir}")
+        
         # Export each model to CSV
         models_data = {
             'customers': Customer.query.all(),
@@ -151,34 +155,42 @@ def backup_database():
             csv_filepath = os.path.join(temp_dir, csv_filename)
             csv_files.append((csv_filepath, csv_filename))
             
-            if data:
-                # Write CSV with proper headers
-                with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
-                    if data:
-                        # Get field names from the first record
-                        first_record = data[0].to_dict()
-                        fieldnames = list(first_record.keys())
-                        
-                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                        writer.writeheader()
-                        
-                        for item in data:
-                            item_dict = item.to_dict()
-                            # Convert None values to empty strings
-                            item_dict = {k: (v if v is not None else '') for k, v in item_dict.items()}
-                            writer.writerow(item_dict)
-            else:
-                # Create empty CSV with headers
-                headers = get_model_headers(model_name)
-                with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
+            print(f"Creating CSV for {model_name} with {len(data)} records")
+            
+            # Write CSV with proper headers
+            with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
+                if data:
+                    # Get field names from the first record
+                    first_record = data[0].to_dict()
+                    fieldnames = list(first_record.keys())
+                    
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    
+                    for item in data:
+                        item_dict = item.to_dict()
+                        # Convert None values to empty strings and handle dates
+                        for key, value in item_dict.items():
+                            if value is None:
+                                item_dict[key] = ''
+                            elif hasattr(value, 'isoformat'):  # Handle datetime/date objects
+                                item_dict[key] = value.isoformat()
+                        writer.writerow(item_dict)
+                else:
+                    # Create empty CSV with headers
+                    headers = get_model_headers(model_name)
                     writer = csv.writer(csvfile)
                     writer.writerow(headers)
         
         # Create ZIP file
+        print(f"Creating ZIP file with {len(csv_files)} CSV files")
         with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for csv_filepath, csv_filename in csv_files:
-                zipf.write(csv_filepath, csv_filename)
+                if os.path.exists(csv_filepath):
+                    zipf.write(csv_filepath, csv_filename)
+                    print(f"Added {csv_filename} to ZIP")
     
+    print(f"Backup created successfully: {zip_filename}")
     return zip_filename
 
 def get_model_headers(model_name):
