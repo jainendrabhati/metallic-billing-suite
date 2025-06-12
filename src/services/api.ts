@@ -35,7 +35,11 @@ export interface Employee {
   name: string;
   mobile: string;
   address: string;
+  position: string;
   monthly_salary: number;
+  total_calculated_salary?: number;
+  total_paid_amount?: number;
+  remaining_amount?: number;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +71,7 @@ export interface Expense {
   amount: number;
   date: string;
   category: string;
+  status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -271,6 +276,22 @@ export const transactionAPI = {
     }
     return response.json();
   },
+
+  exportCSV: async () => {
+    const response = await fetch(`${API_BASE_URL}/transactions/export/csv`);
+    if (!response.ok) {
+      throw new Error("Failed to export CSV");
+    }
+    return response.json();
+  },
+
+  exportPDF: async () => {
+    const response = await fetch(`${API_BASE_URL}/transactions/export/pdf`);
+    if (!response.ok) {
+      throw new Error("Failed to export PDF");
+    }
+    return response.json();
+  },
 };
 
 export const employeeAPI = {
@@ -330,6 +351,14 @@ export const employeePaymentAPI = {
     return response.json();
   },
 
+  getByEmployeeId: async (employeeId: number) => {
+    const response = await fetch(`${API_BASE_URL}/employee-payments/employee/${employeeId}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch employee payments");
+    }
+    return response.json();
+  },
+
   create: async (paymentData: any) => {
     const response = await fetch(`${API_BASE_URL}/employee-payments`, {
       method: "POST",
@@ -348,6 +377,14 @@ export const employeePaymentAPI = {
 export const employeeSalaryAPI = {
   getAll: async () => {
     const response = await fetch(`${API_BASE_URL}/employee-salaries`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch employee salaries");
+    }
+    return response.json();
+  },
+
+  getByEmployeeId: async (employeeId: number) => {
+    const response = await fetch(`${API_BASE_URL}/employee-salaries/employee/${employeeId}`);
     if (!response.ok) {
       throw new Error("Failed to fetch employee salaries");
     }
