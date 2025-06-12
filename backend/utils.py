@@ -1,11 +1,10 @@
 
 import csv
-import pandas as pd
-from flask import current_app
-from datetime import datetime
 import os
 import zipfile
 import tempfile
+from flask import current_app
+from datetime import datetime
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -153,13 +152,27 @@ def backup_database():
             csv_files.append((csv_filepath, csv_filename))
             
             if data:
-                # Convert to DataFrame and save as CSV
-                df_data = [item.to_dict() for item in data]
-                pd.DataFrame(df_data).to_csv(csv_filepath, index=False)
+                # Write CSV with proper headers
+                with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
+                    if data:
+                        # Get field names from the first record
+                        first_record = data[0].to_dict()
+                        fieldnames = list(first_record.keys())
+                        
+                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                        writer.writeheader()
+                        
+                        for item in data:
+                            item_dict = item.to_dict()
+                            # Convert None values to empty strings
+                            item_dict = {k: (v if v is not None else '') for k, v in item_dict.items()}
+                            writer.writerow(item_dict)
             else:
                 # Create empty CSV with headers
                 headers = get_model_headers(model_name)
-                pd.DataFrame(columns=headers).to_csv(csv_filepath, index=False)
+                with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.writer(csvfile)
+                    writer.writerow(headers)
         
         # Create ZIP file
         with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -194,19 +207,23 @@ def restore_database(zip_file_path):
                 zipf.extractall(temp_dir)
             
             # Clear existing data (be careful!)
-            db.session.query(EmployeePayment).delete()
-            db.session.query(EmployeeSalary).delete()
-            db.session.query(Employee).delete()
-            db.session.query(Stock).delete()
-            db.session.query(StockItem).delete()
-            db.session.query(Transaction).delete()
-            db.session.query(Bill).delete()
-            db.session.query(Expense).delete()
-            db.session.query(Customer).delete()
-            db.session.query(FirmSettings).delete()
-            db.session.commit()
+            try:
+                db.session.query(EmployeePayment).delete()
+                db.session.query(EmployeeSalary).delete()
+                db.session.query(Employee).delete()
+                db.session.query(Stock).delete()
+                db.session.query(StockItem).delete()
+                db.session.query(Transaction).delete()
+                db.session.query(Bill).delete()
+                db.session.query(Expense).delete()
+                db.session.query(Customer).delete()
+                db.session.query(FirmSettings).delete()
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                raise Exception(f"Failed to clear existing data: {str(e)}")
             
-            # Restore data from CSV files
+            # Restore data from CSV files in correct order
             csv_files_order = [
                 ('customers.csv', Customer),
                 ('employees.csv', Employee),
@@ -229,35 +246,44 @@ def restore_database(zip_file_path):
                     continue
                 
                 try:
-                    df = pd.read_csv(csv_filepath)
-                    
-                    if not df.empty:
-                        for _, row in df.iterrows():
-                            # Create model instance
-                            data = row.to_dict()
+                    with open(csv_filepath, 'r', encoding='utf-8') as csvfile:
+                        reader = csv.DictReader(csvfile)
+                        
+                        for row in reader:
+                            # Remove empty values and convert types
+                            data = {}
+                            for key, value in row.items():
+                                if value and value.strip():  # Skip empty values
+                                    # Handle date fields
+                                    if key in ['date', 'payment_date'] and value:
+                                        try:
+                                            # Try different date formats
+                                            if 'T' in value:  # ISO format
+                                                data[key] = datetime.fromisoformat(value.replace('Z', '+00:00')).date()
+                                            else:  # Simple date format
+                                                data[key] = datetime.strptime(value, '%Y-%m-%d').date()
+                                        except:
+                                            continue  # Skip invalid dates
+                                    elif key in ['created_at', 'updated_at'] and value:
+                                        try:
+                                            if 'T' in value:  # ISO format
+                                                data[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                            else:
+                                                data[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                                        except:
+                                            pass  # Skip timestamp fields if invalid
+                                    elif key == 'id':
+                                        continue  # Skip ID for auto-increment
+                                    else:
+                                        data[key] = value
                             
-                            # Remove NaN values
-                            data = {k: v for k, v in data.items() if pd.notna(v)}
-                            
-                            # Remove id and timestamps for new creation
-                            if 'id' in data:
-                                del data['id']
-                            if 'created_at' in data:
-                                del data['created_at']
-                            if 'updated_at' in data:
-                                del data['updated_at']
-                            
-                            # Handle date fields
-                            if model_class == Bill and 'date' in data:
-                                data['date'] = pd.to_datetime(data['date']).date()
-                            elif model_class == Expense and 'date' in data:
-                                data['date'] = pd.to_datetime(data['date']).date()
-                            elif model_class == EmployeePayment and 'payment_date' in data:
-                                data['payment_date'] = pd.to_datetime(data['payment_date']).date()
-                            
-                            # Create instance
-                            instance = model_class(**data)
-                            db.session.add(instance)
+                            if data:  # Only create if we have valid data
+                                try:
+                                    instance = model_class(**data)
+                                    db.session.add(instance)
+                                except Exception as e:
+                                    print(f"Error creating {model_class.__name__} instance: {str(e)}")
+                                    continue
                 
                 except Exception as e:
                     print(f"Warning: Error processing {csv_filename}: {str(e)}")
@@ -267,4 +293,4 @@ def restore_database(zip_file_path):
             
     except Exception as e:
         db.session.rollback()
-        raise e
+        raise Exception(f"Database restore failed: {str(e)}")

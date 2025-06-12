@@ -1,5 +1,5 @@
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, current_app
 from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, FirmSettings
 from utils import backup_database, restore_database
 import os
@@ -33,6 +33,10 @@ def download_backup():
         zip_filename = backup_database()
         zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
         
+        # Check if file exists
+        if not os.path.exists(zip_filepath):
+            return jsonify({'error': 'Backup file not found'}), 404
+        
         # Send file for download
         return send_file(
             zip_filepath,
@@ -41,7 +45,7 @@ def download_backup():
             mimetype='application/zip'
         )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Backup failed: {str(e)}'}), 500
 
 @dashboard_bp.route('/backup/upload', methods=['POST'])
 def upload_backup():
@@ -66,17 +70,18 @@ def upload_backup():
             restore_database(temp_filepath)
             
             # Clean up temporary file
-            os.remove(temp_filepath)
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
             
             return jsonify({'message': 'Database restored successfully'}), 200
         except Exception as restore_error:
             # Clean up temporary file if restore fails
             if os.path.exists(temp_filepath):
                 os.remove(temp_filepath)
-            raise restore_error
+            return jsonify({'error': f'Restore failed: {str(restore_error)}'}), 500
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 # Dashboard API
 @dashboard_bp.route('/dashboard', methods=['GET'])
