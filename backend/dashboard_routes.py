@@ -1,6 +1,9 @@
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, FirmSettings
+from utils import backup_database, restore_database
+import os
+from werkzeug.utils import secure_filename
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -26,14 +29,52 @@ def update_settings():
 @dashboard_bp.route('/backup/download', methods=['GET'])
 def download_backup():
     try:
-        return jsonify({'message': 'Backup downloaded'}), 200
+        # Create backup ZIP file
+        zip_filename = backup_database()
+        zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
+        
+        # Send file for download
+        return send_file(
+            zip_filepath,
+            as_attachment=True,
+            download_name=zip_filename,
+            mimetype='application/zip'
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @dashboard_bp.route('/backup/upload', methods=['POST'])
 def upload_backup():
     try:
-        return jsonify({'message': 'Backup uploaded'}), 200
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.zip'):
+            return jsonify({'error': 'Please upload a valid ZIP file'}), 400
+        
+        # Save uploaded file temporarily
+        filename = secure_filename(file.filename)
+        temp_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], f"temp_{filename}")
+        file.save(temp_filepath)
+        
+        try:
+            # Restore database from ZIP file
+            restore_database(temp_filepath)
+            
+            # Clean up temporary file
+            os.remove(temp_filepath)
+            
+            return jsonify({'message': 'Database restored successfully'}), 200
+        except Exception as restore_error:
+            # Clean up temporary file if restore fails
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+            raise restore_error
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

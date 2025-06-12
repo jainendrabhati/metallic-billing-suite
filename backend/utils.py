@@ -11,7 +11,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, StockItem, Stock, FirmSettings
+from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, StockItem, Stock, FirmSettings, EmployeeSalary
 
 def export_to_csv(data, data_type):
     """Export data to CSV format"""
@@ -138,6 +138,7 @@ def backup_database():
             'transactions': Transaction.query.all(),
             'expenses': Expense.query.all(),
             'employees': Employee.query.all(),
+            'employee_salaries': EmployeeSalary.query.all(),
             'employee_payments': EmployeePayment.query.all(),
             'stock_items': StockItem.query.all(),
             'stock': Stock.query.all(),
@@ -157,25 +158,7 @@ def backup_database():
                 pd.DataFrame(df_data).to_csv(csv_filepath, index=False)
             else:
                 # Create empty CSV with headers
-                if model_name == 'customers':
-                    headers = ['id', 'name', 'mobile', 'address', 'total_bills', 'total_amount', 'status', 'created_at', 'updated_at']
-                elif model_name == 'bills':
-                    headers = ['id', 'bill_number', 'customer_id', 'item', 'weight', 'tunch', 'wages', 'wastage', 'silver_amount', 'total_fine', 'total_amount', 'payment_type', 'slip_no', 'description', 'date', 'created_at', 'updated_at']
-                elif model_name == 'transactions':
-                    headers = ['id', 'bill_id', 'customer_id', 'amount', 'transaction_type', 'description', 'created_at', 'updated_at']
-                elif model_name == 'expenses':
-                    headers = ['id', 'description', 'amount', 'category', 'status', 'date', 'created_at', 'updated_at']
-                elif model_name == 'employees':
-                    headers = ['id', 'name', 'position', 'monthly_salary', 'present_days', 'total_days', 'calculated_salary', 'paid_amount', 'remaining_amount', 'created_at', 'updated_at']
-                elif model_name == 'employee_payments':
-                    headers = ['id', 'employee_id', 'amount', 'payment_date', 'description', 'created_at', 'updated_at']
-                elif model_name == 'stock_items':
-                    headers = ['id', 'item_name', 'current_weight', 'description', 'created_at', 'updated_at']
-                elif model_name == 'stock':
-                    headers = ['id', 'amount', 'transaction_type', 'item_name', 'description', 'created_at']
-                elif model_name == 'firm_settings':
-                    headers = ['id', 'firm_name', 'gst_number', 'address', 'logo_path', 'created_at', 'updated_at']
-                
+                headers = get_model_headers(model_name)
                 pd.DataFrame(columns=headers).to_csv(csv_filepath, index=False)
         
         # Create ZIP file
@@ -185,17 +168,34 @@ def backup_database():
     
     return zip_filename
 
-def restore_database(zip_file):
+def get_model_headers(model_name):
+    """Get headers for each model"""
+    headers_map = {
+        'customers': ['id', 'name', 'mobile', 'address', 'total_bills', 'created_at', 'updated_at'],
+        'bills': ['id', 'bill_number', 'customer_id', 'item_name', 'item', 'weight', 'tunch', 'wages', 'wastage', 'silver_amount', 'total_fine', 'total_amount', 'payment_type', 'slip_no', 'description', 'date', 'created_at', 'updated_at'],
+        'transactions': ['id', 'bill_id', 'customer_id', 'amount', 'transaction_type', 'description', 'created_at', 'updated_at'],
+        'expenses': ['id', 'description', 'amount', 'category', 'status', 'date', 'created_at', 'updated_at'],
+        'employees': ['id', 'name', 'position', 'created_at', 'updated_at'],
+        'employee_salaries': ['id', 'employee_id', 'month', 'year', 'monthly_salary', 'present_days', 'total_days', 'calculated_salary', 'created_at', 'updated_at'],
+        'employee_payments': ['id', 'employee_id', 'amount', 'payment_date', 'description', 'created_at', 'updated_at'],
+        'stock_items': ['id', 'item_name', 'current_weight', 'description', 'created_at', 'updated_at'],
+        'stock': ['id', 'amount', 'transaction_type', 'item_name', 'description', 'created_at'],
+        'firm_settings': ['id', 'firm_name', 'gst_number', 'address', 'logo_path', 'created_at', 'updated_at']
+    }
+    return headers_map.get(model_name, [])
+
+def restore_database(zip_file_path):
     """Restore database from uploaded ZIP file containing CSV files"""
     try:
         # Create temporary directory to extract ZIP
         with tempfile.TemporaryDirectory() as temp_dir:
             # Extract ZIP file
-            with zipfile.ZipFile(zip_file, 'r') as zipf:
+            with zipfile.ZipFile(zip_file_path, 'r') as zipf:
                 zipf.extractall(temp_dir)
             
             # Clear existing data (be careful!)
             db.session.query(EmployeePayment).delete()
+            db.session.query(EmployeeSalary).delete()
             db.session.query(Employee).delete()
             db.session.query(Stock).delete()
             db.session.query(StockItem).delete()
@@ -207,28 +207,37 @@ def restore_database(zip_file):
             db.session.commit()
             
             # Restore data from CSV files
-            csv_files = {
-                'customers.csv': Customer,
-                'bills.csv': Bill,
-                'transactions.csv': Transaction,
-                'expenses.csv': Expense,
-                'employees.csv': Employee,
-                'employee_payments.csv': EmployeePayment,
-                'stock_items.csv': StockItem,
-                'stock.csv': Stock,
-                'firm_settings.csv': FirmSettings
-            }
+            csv_files_order = [
+                ('customers.csv', Customer),
+                ('employees.csv', Employee),
+                ('bills.csv', Bill),
+                ('transactions.csv', Transaction),
+                ('expenses.csv', Expense),
+                ('employee_salaries.csv', EmployeeSalary),
+                ('employee_payments.csv', EmployeePayment),
+                ('stock_items.csv', StockItem),
+                ('stock.csv', Stock),
+                ('firm_settings.csv', FirmSettings)
+            ]
             
-            for csv_filename, model_class in csv_files.items():
+            for csv_filename, model_class in csv_files_order:
                 csv_filepath = os.path.join(temp_dir, csv_filename)
                 
-                if os.path.exists(csv_filepath):
+                # Skip if CSV file doesn't exist
+                if not os.path.exists(csv_filepath):
+                    print(f"Warning: {csv_filename} not found in backup, skipping...")
+                    continue
+                
+                try:
                     df = pd.read_csv(csv_filepath)
                     
                     if not df.empty:
                         for _, row in df.iterrows():
                             # Create model instance
                             data = row.to_dict()
+                            
+                            # Remove NaN values
+                            data = {k: v for k, v in data.items() if pd.notna(v)}
                             
                             # Remove id and timestamps for new creation
                             if 'id' in data:
@@ -249,6 +258,10 @@ def restore_database(zip_file):
                             # Create instance
                             instance = model_class(**data)
                             db.session.add(instance)
+                
+                except Exception as e:
+                    print(f"Warning: Error processing {csv_filename}: {str(e)}")
+                    continue
             
             db.session.commit()
             
