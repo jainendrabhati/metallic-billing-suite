@@ -1,4 +1,93 @@
+
 import { API_BASE_URL } from "@/config";
+
+// Type definitions
+export interface Customer {
+  id: number;
+  name: string;
+  mobile: string;
+  address: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Bill {
+  id: number;
+  bill_number: string;
+  customer_name: string;
+  item: string;
+  weight: number;
+  tunch: number;
+  wastage: number;
+  wages: number;
+  total_fine: number;
+  total_amount: number;
+  silver_amount: number;
+  payment_type: 'credit' | 'debit';
+  date: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Employee {
+  id: number;
+  name: string;
+  mobile: string;
+  address: string;
+  monthly_salary: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeePayment {
+  id: number;
+  employee_id: number;
+  amount: number;
+  payment_date: string;
+  description: string;
+  created_at: string;
+}
+
+export interface EmployeeSalary {
+  id: number;
+  employee_id: number;
+  month: string;
+  year: number;
+  monthly_salary: number;
+  present_days: number;
+  total_days: number;
+  calculated_salary: number;
+  created_at: string;
+}
+
+export interface Expense {
+  id: number;
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockItem {
+  id: number;
+  item_name: string;
+  current_weight: number;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockTransaction {
+  id: number;
+  item_name: string;
+  transaction_type: 'add' | 'deduct';
+  amount: number;
+  description: string;
+  created_at: string;
+}
 
 export const customerAPI = {
   getAll: async () => {
@@ -9,10 +98,42 @@ export const customerAPI = {
     return response.json();
   },
 
+  getById: async (id: number) => {
+    const response = await fetch(`${API_BASE_URL}/customers/${id}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch customer");
+    }
+    return response.json();
+  },
+
+  search: async (query: string) => {
+    const response = await fetch(`${API_BASE_URL}/customers/search?q=${encodeURIComponent(query)}`);
+    if (!response.ok) {
+      throw new Error("Failed to search customers");
+    }
+    return response.json();
+  },
+
   getPendingCustomers: async () => {
     const response = await fetch(`${API_BASE_URL}/customers/pending`);
     if (!response.ok) {
       throw new Error("Failed to fetch pending customers");
+    }
+    return response.json();
+  },
+
+  getPendingList: async () => {
+    const response = await fetch(`${API_BASE_URL}/customers/pending-list`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch pending list");
+    }
+    return response.json();
+  },
+
+  getCustomerBills: async (customerId: number) => {
+    const response = await fetch(`${API_BASE_URL}/customers/${customerId}/bills`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch customer bills");
     }
     return response.json();
   },
@@ -200,11 +321,94 @@ export const employeeAPI = {
   },
 };
 
+export const employeePaymentAPI = {
+  getAll: async () => {
+    const response = await fetch(`${API_BASE_URL}/employee-payments`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch employee payments");
+    }
+    return response.json();
+  },
+
+  create: async (paymentData: any) => {
+    const response = await fetch(`${API_BASE_URL}/employee-payments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(paymentData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to create employee payment");
+    }
+    return response.json();
+  },
+};
+
+export const employeeSalaryAPI = {
+  getAll: async () => {
+    const response = await fetch(`${API_BASE_URL}/employee-salaries`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch employee salaries");
+    }
+    return response.json();
+  },
+
+  create: async (salaryData: any) => {
+    const response = await fetch(`${API_BASE_URL}/employee-salaries`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(salaryData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to create employee salary");
+    }
+    return response.json();
+  },
+};
+
 export const stockAPI = {
   getAll: async () => {
     const response = await fetch(`${API_BASE_URL}/stock`);
     if (!response.ok) {
       throw new Error("Failed to fetch stock");
+    }
+    return response.json();
+  },
+
+  getCurrent: async () => {
+    const response = await fetch(`${API_BASE_URL}/stock/current`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch current stock");
+    }
+    return response.json();
+  },
+
+  getHistory: async () => {
+    const response = await fetch(`${API_BASE_URL}/stock/history`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch stock history");
+    }
+    return response.json();
+  },
+
+  addTransaction: async (amount: number, type: 'add' | 'deduct', itemName: string, description: string) => {
+    const response = await fetch(`${API_BASE_URL}/stock/transaction`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount,
+        transaction_type: type,
+        item_name: itemName,
+        description,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to add stock transaction");
     }
     return response.json();
   },
@@ -248,11 +452,67 @@ export const stockAPI = {
   },
 };
 
+export const stockItemAPI = {
+  getAll: async () => {
+    const response = await fetch(`${API_BASE_URL}/stock-items`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch stock items");
+    }
+    return response.json();
+  },
+
+  create: async (itemData: any) => {
+    const response = await fetch(`${API_BASE_URL}/stock-items`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(itemData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to create stock item");
+    }
+    return response.json();
+  },
+
+  update: async (id: number, itemData: any) => {
+    const response = await fetch(`${API_BASE_URL}/stock-items/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(itemData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to update stock item");
+    }
+    return response.json();
+  },
+
+  delete: async (id: number) => {
+    const response = await fetch(`${API_BASE_URL}/stock-items/${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete stock item");
+    }
+    return response.json();
+  },
+};
+
 export const expenseAPI = {
   getAll: async () => {
     const response = await fetch(`${API_BASE_URL}/expenses`);
     if (!response.ok) {
       throw new Error("Failed to fetch expenses");
+    }
+    return response.json();
+  },
+
+  getDashboard: async () => {
+    const response = await fetch(`${API_BASE_URL}/expenses/dashboard`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch expenses dashboard");
     }
     return response.json();
   },
