@@ -1,4 +1,3 @@
-
 import { API_BASE_URL } from "@/config";
 
 // Type definitions
@@ -277,32 +276,70 @@ export const transactionAPI = {
     return response.json();
   },
 
-  exportCSV: async (data: any[]) => {
-    const response = await fetch(`${API_BASE_URL}/transactions/export/csv`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ data }),
-    });
+  exportCSV: async (filters: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+    if (filters.customer_name) params.append('customer_name', filters.customer_name);
+    
+    const response = await fetch(`${API_BASE_URL}/transactions/export/csv?${params.toString()}`);
+    
     if (!response.ok) {
       throw new Error("Failed to export CSV");
     }
-    return response.json();
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = 'transactions.csv';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch && filenameMatch.length > 1) {
+        filename = filenameMatch[1];
+      }
+    }
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    return { success: true };
   },
 
-  exportPDF: async (data: any[]) => {
-    const response = await fetch(`${API_BASE_URL}/transactions/export/pdf`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ data }),
-    });
+  exportPDF: async (filters: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+    if (filters.customer_name) params.append('customer_name', filters.customer_name);
+
+    const response = await fetch(`${API_BASE_URL}/transactions/export/pdf?${params.toString()}`);
+    
     if (!response.ok) {
       throw new Error("Failed to export PDF");
     }
-    return response.json();
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = 'transactions.pdf';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch && filenameMatch.length > 1) {
+        filename = filenameMatch[1];
+      }
+    }
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    return { success: true };
   },
 };
 

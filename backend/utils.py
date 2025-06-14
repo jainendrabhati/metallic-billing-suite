@@ -6,7 +6,7 @@ import tempfile
 from flask import current_app
 from datetime import datetime
 from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -57,39 +57,92 @@ def export_to_pdf(data, data_type):
     filename = f"{data_type}_export_{timestamp}.pdf"
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
     
-    doc = SimpleDocTemplate(filepath, pagesize=A4)
+    doc = SimpleDocTemplate(filepath, pagesize=A4, rightMargin=inch/2, leftMargin=inch/2, topMargin=inch/2, bottomMargin=inch/2)
     elements = []
     
-    # Styles
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        spaceAfter=30,
-        alignment=1  # Center alignment
-    )
-    
-    # Title
-    title = Paragraph(f"Metalic Jewelers - {data_type.title()} Report", title_style)
-    elements.append(title)
-    elements.append(Spacer(1, 12))
-    
+
     if data_type == 'transactions':
-        # Create table data
-        table_data = [['Transaction ID', 'Bill Number', 'Customer', 'Amount', 'Type', 'Date']]
+        # Firm Settings for Header
+        firm_settings = FirmSettings.query.first()
+        if firm_settings:
+            if firm_settings.logo_path and os.path.exists(firm_settings.logo_path):
+                try:
+                    logo = Image(firm_settings.logo_path, width=0.75*inch, height=0.75*inch)
+                    logo.hAlign = 'LEFT'
+                    elements.append(logo)
+                except Exception as e:
+                    print(f"Could not load logo: {e}")
+
+            firm_name_style = ParagraphStyle('FirmName', parent=styles['h1'], alignment=1)
+            elements.append(Paragraph(firm_settings.firm_name, firm_name_style))
+            
+            firm_details_style = ParagraphStyle('FirmDetails', parent=styles['Normal'], alignment=1, spaceBefore=6)
+            elements.append(Paragraph(firm_settings.address, firm_details_style))
+            elements.append(Paragraph(f"GST: {firm_settings.gst_number}", firm_details_style))
+            elements.append(Spacer(1, 20))
+        
+        # Title
+        title_style = ParagraphStyle('ReportTitle', parent=styles['h2'], alignment=1)
+        title = Paragraph(f"{data_type.title()} Report", title_style)
+        elements.append(title)
+        elements.append(Spacer(1, 12))
+
+        # Table Data and Totals Calculation
+        table_data = [['Bill No.', 'Customer', 'Amount (INR)', 'Fine (g)', 'Type', 'Date']]
+        total_amount_credit = 0
+        total_amount_debit = 0
+        total_fine_credit = 0
+        total_fine_debit = 0
         
         for transaction in data:
+            fine_val = transaction.bill.total_fine if transaction.bill and transaction.bill.total_fine is not None else 0
+            
             table_data.append([
-                str(transaction.id),
-                f"BILL-{transaction.bill_id:04d}" if transaction.bill_id else '',
-                transaction.customer.name if transaction.customer else '',
-                f"₹{transaction.amount:,.2f}",
+                f"BILL-{transaction.bill.bill_number:04d}" if transaction.bill else 'N/A',
+                transaction.customer.name if transaction.customer else 'N/A',
+                f"{transaction.amount:,.2f}",
+                f"{fine_val:.3f}",
                 transaction.transaction_type.title(),
                 transaction.created_at.strftime('%Y-%m-%d')
             ])
+
+            if transaction.transaction_type == 'credit':
+                total_amount_credit += transaction.amount
+                total_fine_credit += fine_val
+            elif transaction.transaction_type == 'debit':
+                total_amount_debit += transaction.amount
+                total_fine_debit += fine_val
+        
+        # Create table
+        table = Table(table_data, colWidths=[1.2*inch, 2*inch, 1.2*inch, 1.2*inch, 0.8*inch, 1*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ]))
+        elements.append(table)
+        elements.append(Spacer(1, 24))
+
+        # Summary Section
+        net_total_amount = total_amount_credit - total_amount_debit
+        net_total_fine = total_fine_credit - total_fine_debit
+        
+        summary_style = ParagraphStyle('Summary', parent=styles['Normal'], fontSize=12, spaceBefore=6)
+        
+        summary_title = Paragraph("<b>Summary</b>", styles['h3'])
+        elements.append(summary_title)
+        elements.append(Paragraph(f"<b>Net Total Amount:</b> ₹{net_total_amount:,.2f}", summary_style))
+        elements.append(Paragraph(f"<b>Net Total Fine:</b> {net_total_fine:.3f} g", summary_style))
     
     elif data_type == 'expenses':
+        # Original expenses PDF code
         table_data = [['ID', 'Description', 'Amount', 'Category', 'Status', 'Date']]
         
         for expense in data:
@@ -101,23 +154,27 @@ def export_to_pdf(data, data_type):
                 expense.status.title(),
                 expense.date.strftime('%Y-%m-%d')
             ])
+        
+        # Title
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30, alignment=1)
+        title = Paragraph(f"Metalic Jewelers - {data_type.title()} Report", title_style)
+        elements.append(title)
+        elements.append(Spacer(1, 12))
+        
+        table = Table(table_data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(table)
     
-    # Create table
-    table = Table(table_data)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 14),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    
-    elements.append(table)
-    
-    # Build PDF
     doc.build(elements)
     
     return filename
