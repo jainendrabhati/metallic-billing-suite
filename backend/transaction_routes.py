@@ -1,7 +1,5 @@
-
 from flask import Blueprint, request, jsonify, send_from_directory, current_app
 from models import db, Transaction, Bill, Stock
-from utils import export_to_csv, export_to_pdf
 
 transaction_bp = Blueprint('transaction', __name__)
 
@@ -47,6 +45,7 @@ def get_filtered_transactions():
 @transaction_bp.route('/transactions/export/csv', methods=['GET'])
 def export_transactions_csv():
     try:
+        from utils import export_to_csv
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         customer_name = request.args.get('customer_name')
@@ -70,6 +69,7 @@ def export_transactions_csv():
 @transaction_bp.route('/transactions/export/pdf', methods=['GET'])
 def export_transactions_pdf():
     try:
+        from utils import export_to_pdf
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         customer_name = request.args.get('customer_name')
