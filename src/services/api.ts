@@ -239,12 +239,11 @@ export const transactionAPI = {
   },
 
   getFiltered: async (filters: { start_date?: string; end_date?: string; customer_name?: string }) => {
-    // Always send all filters, even if blank
+    // Always append all filters, even if blank
     const params = new URLSearchParams();
-    params.append('start_date', filters.start_date || '');
-    params.append('end_date', filters.end_date || '');
-    params.append('customer_name', filters.customer_name || '');
-
+    params.append("start_date", filters.start_date || "");
+    params.append("end_date", filters.end_date || "");
+    params.append("customer_name", filters.customer_name || "");
     const response = await fetch(`${API_BASE_URL}/transactions/filtered?${params.toString()}`);
     if (!response.ok) {
       throw new Error("Failed to fetch filtered transactions");
@@ -291,24 +290,22 @@ export const transactionAPI = {
   },
 
   exportCSV: async (filters: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    // Always append all filters, even if blank
     const params = new URLSearchParams();
-    if (filters.start_date) params.append('start_date', filters.start_date);
-    if (filters.end_date) params.append('end_date', filters.end_date);
-    if (filters.customer_name) params.append('customer_name', filters.customer_name);
-    
+    params.append("start_date", filters.start_date || "");
+    params.append("end_date", filters.end_date || "");
+    params.append("customer_name", filters.customer_name || "");
     const response = await fetch(`${API_BASE_URL}/transactions/export/csv?${params.toString()}`);
-    
     if (!response.ok) {
       throw new Error("Failed to export CSV");
     }
-    
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    
-    const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = 'transactions.csv';
+
+    const contentDisposition = response.headers.get("Content-Disposition");
+    let filename = "transactions.csv";
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="(.+)"/);
       if (filenameMatch && filenameMatch.length > 1) {
@@ -324,24 +321,21 @@ export const transactionAPI = {
   },
 
   exportPDF: async (filters: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    // Always append all filters, even if blank
     const params = new URLSearchParams();
-    if (filters.start_date) params.append('start_date', filters.start_date);
-    if (filters.end_date) params.append('end_date', filters.end_date);
-    if (filters.customer_name) params.append('customer_name', filters.customer_name);
-
+    params.append("start_date", filters.start_date || "");
+    params.append("end_date", filters.end_date || "");
+    params.append("customer_name", filters.customer_name || "");
     const response = await fetch(`${API_BASE_URL}/transactions/export/pdf?${params.toString()}`);
-    
     if (!response.ok) {
       throw new Error("Failed to export PDF");
     }
-    
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    
-    const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = 'transactions.pdf';
+    const contentDisposition = response.headers.get("Content-Disposition");
+    let filename = "transactions.pdf";
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="(.+)"/);
       if (filenameMatch && filenameMatch.length > 1) {

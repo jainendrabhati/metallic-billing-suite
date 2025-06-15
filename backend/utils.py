@@ -13,25 +13,35 @@ from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeeP
 
 def export_to_csv(data, data_type):
     """Export data to CSV format"""
+    from datetime import datetime
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{data_type}_export_{timestamp}.csv"
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-    
+
     if data_type == 'transactions':
+        # Unified - bills only, using the filtered queryset from Transaction
         with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['Transaction ID', 'Bill Number', 'Customer Name', 'Amount', 'Type', 'Date', 'Description'])
-            
-            for transaction in data:
-                writer.writerow([
-                    transaction.id,
-                    f"BILL-{transaction.bill_id:04d}" if transaction.bill_id else '',
-                    transaction.customer.name if transaction.customer else '',
-                    transaction.amount,
-                    transaction.transaction_type,
-                    transaction.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                    transaction.description or ''
-                ])
+            # Only the selected columns:
+            writer.writerow([
+                'Customer Name', 'Item Name', 'Weight', 'Silver Amount', 'Total Fine', 'Total Amount',
+                'Bill Type', 'Date'
+            ])
+
+            for t in data:
+                bill = getattr(t, "bill", None)
+                customer = getattr(t, "customer", None)
+                if bill:
+                    writer.writerow([
+                        customer.name if customer else "",
+                        bill.item_name or "",
+                        f"{bill.weight:.3f}" if bill.weight is not None else "",
+                        f"{bill.silver_amount:.2f}" if bill.silver_amount is not None else "",
+                        f"{bill.total_fine:.3f}" if bill.total_fine is not None else "",
+                        f"{bill.total_amount:.2f}" if bill.total_amount is not None else "",
+                        bill.payment_type.title() if bill.payment_type else "",
+                        bill.date.strftime("%Y-%m-%d") if bill.date else ""
+                    ])
     
     elif data_type == 'expenses':
         with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
@@ -60,8 +70,12 @@ def export_to_pdf(data, data_type):
     styles = getSampleStyleSheet()
 
     if data_type == 'transactions':
+        from reportlab.lib.pagesizes import A4
         # Firm Settings for Header
         firm_settings = FirmSettings.query.first()
+        elements = []
+        styles = getSampleStyleSheet()
+
         if firm_settings:
             if firm_settings.logo_path and os.path.exists(firm_settings.logo_path):
                 try:
@@ -77,15 +91,16 @@ def export_to_pdf(data, data_type):
             elements.append(Paragraph(f"GST: {firm_settings.gst_number}", firm_details_style))
             elements.append(Spacer(1, 20))
 
-        title_style = ParagraphStyle('ReportTitle', parent=styles['h2'], alignment=1)
+        title_style = ParagraphStyle("ReportTitle", parent=styles["h2"], alignment=1)
         elements.append(Paragraph("Transactions Report", title_style))
         elements.append(Spacer(1, 12))
 
-        # Prepare single table of ALL bills (from transactions)
+        # New: Table with all bills (exclude address/mobile), only specific columns
         table_data = [
-            ['Bill No.', 'Date', 'Customer', 'Payment Type', 'Item Name', 'Item Type', 
-             'Weight (g)', 'Tunch (%)', 'Wastage (%)', 'Wages', 
-             'Silver Amount', 'Total Fine', 'Total Amount', 'Slip No.', 'Description', 'Transaction Type', 'Amount']
+            [
+                "Customer Name", "Item Name", "Weight", "Silver Amount",
+                "Total Fine", "Total Amount", "Bill Type", "Date"
+            ]
         ]
         total_amount_credit = 0
         total_amount_debit = 0
@@ -93,86 +108,55 @@ def export_to_pdf(data, data_type):
         total_fine_debit = 0
 
         for t in data:
-            bill = getattr(t, 'bill', None)
-            customer = getattr(t, 'customer', None)
-            # Only if there's a bill
+            bill = getattr(t, "bill", None)
+            customer = getattr(t, "customer", None)
             if bill:
-                row = [
-                    f"BILL-{bill.bill_number:04d}",
-                    bill.date.strftime('%Y-%m-%d') if bill.date else '',
-                    customer.name if customer else '',
-                    bill.payment_type.title() if bill.payment_type else '',
-                    bill.item_name or '',
-                    bill.item or '',
-                    f"{bill.weight:.3f}" if bill.weight is not None else '',
-                    f"{bill.tunch:.2f}" if bill.tunch is not None else '',
-                    f"{bill.wastage:.2f}" if bill.wastage is not None else '',
-                    f"{bill.wages:.2f}" if bill.wages is not None else '',
-                    f"₹{bill.silver_amount:,.2f}" if bill.silver_amount is not None else '',
-                    f"{bill.total_fine:.3f}" if bill.total_fine is not None else '',
-                    f"₹{bill.total_amount:,.2f}" if bill.total_amount is not None else '',
-                    bill.slip_no or '',
-                    bill.description or '',
-                    t.transaction_type.title(),
-                    f"₹{t.amount:,.2f}"
-                ]
-                fine_val = bill.total_fine if bill and bill.total_fine is not None else 0
+                table_data.append([
+                    customer.name if customer else "",
+                    bill.item_name or "",
+                    f"{bill.weight:.3f}" if bill.weight is not None else "",
+                    f"₹{bill.silver_amount:,.2f}" if bill.silver_amount is not None else "",
+                    f"{bill.total_fine:.3f}" if bill.total_fine is not None else "",
+                    f"₹{bill.total_amount:,.2f}" if bill.total_amount is not None else "",
+                    bill.payment_type.title() if bill.payment_type else "",
+                    bill.date.strftime("%Y-%m-%d") if bill.date else ""
+                ])
+                fine_val = bill.total_fine if bill.total_fine is not None else 0
                 if t.transaction_type == 'credit':
                     total_amount_credit += t.amount
                     total_fine_credit += fine_val
                 elif t.transaction_type == 'debit':
                     total_amount_debit += t.amount
                     total_fine_debit += fine_val
-                table_data.append(row)
-            else:
-                # For transaction with no bill, display only as much as possible
-                row = [
-                    "",  # Bill No.
-                    t.created_at.strftime('%Y-%m-%d'),
-                    customer.name if customer else '',
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    t.description or '',
-                    t.transaction_type.title(),
-                    f"₹{t.amount:,.2f}"
-                ]
-                if t.transaction_type == 'credit':
-                    total_amount_credit += t.amount
-                elif t.transaction_type == 'debit':
-                    total_amount_debit += t.amount
-                table_data.append(row)
 
-        table = Table(table_data, repeatRows=1)  # repeat header row on each page
+        table = Table(table_data, repeatRows=1)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), "CENTER"),
+            ('FONTNAME', (0, 0), (-1, 0), "Helvetica-Bold"),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ]))
         elements.append(table)
         elements.append(Spacer(1, 24))
-        # Summary Section (as before)
+
+        # Summary Section
         net_total_amount = total_amount_credit - total_amount_debit
         net_total_fine = total_fine_credit - total_fine_debit
-        summary_style = ParagraphStyle('Summary', parent=styles['Normal'], fontSize=12, spaceBefore=6)
-        summary_title = Paragraph("<b>Summary</b>", styles['h3'])
+        summary_style = ParagraphStyle("Summary", parent=styles["Normal"], fontSize=12, spaceBefore=6)
+        summary_title = Paragraph("<b>Summary</b>", styles["h3"])
         elements.append(summary_title)
         elements.append(Paragraph(f"<b>Net Total Amount:</b> ₹{net_total_amount:,.2f}", summary_style))
         elements.append(Paragraph(f"<b>Net Total Fine:</b> {net_total_fine:.3f} g", summary_style))
+
+        doc = SimpleDocTemplate(filepath, pagesize=A4, rightMargin=inch/2, leftMargin=inch/2,
+                               topMargin=inch/2, bottomMargin=inch/2)
+        doc.build(elements)
+        return filename
 
     elif data_type == 'expenses':
         # Original expenses PDF code
