@@ -20,7 +20,8 @@
   ],
   "win": {
     "target": "nsis",
-    "publisherName": "Your Company Name"
+    "publisherName": "Your Company Name",
+    "sign": false
   },
   "nsis": {
     "oneClick": false,
