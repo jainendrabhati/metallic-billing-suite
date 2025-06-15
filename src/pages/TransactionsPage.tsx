@@ -25,13 +25,22 @@ const TransactionsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: transactions = [], refetch } = useQuery({
+  const { data: transactions = [], refetch, isError, error } = useQuery({
     queryKey: ['transactions', startDate, endDate, customerName],
-    queryFn: () =>
-      startDate || endDate || customerName
-        ? transactionAPI.getFiltered({ start_date: startDate, end_date: endDate, customer_name: customerName })
-        : transactionAPI.getAll(),
+    queryFn: () => {
+      // If any filters are set, call getFiltered
+      if (startDate || endDate || customerName) {
+        return transactionAPI.getFiltered({ start_date: startDate, end_date: endDate, customer_name: customerName });
+      } else {
+        return transactionAPI.getAll();
+      }
+    },
   });
+
+  // Optional: Show errors for debugging
+  if (isError) {
+    console.error("Transaction query error:", error);
+  }
 
   const updateTransactionMutation = useMutation({
     mutationFn: (data: { id: number; updates: any }) => {
