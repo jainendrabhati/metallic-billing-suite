@@ -239,10 +239,11 @@ export const transactionAPI = {
   },
 
   getFiltered: async (filters: { start_date?: string; end_date?: string; customer_name?: string }) => {
+    // Always send all filters, even if blank
     const params = new URLSearchParams();
-    if (filters.start_date) params.append('start_date', filters.start_date);
-    if (filters.end_date) params.append('end_date', filters.end_date);
-    if (filters.customer_name) params.append('customer_name', filters.customer_name);
+    params.append('start_date', filters.start_date || '');
+    params.append('end_date', filters.end_date || '');
+    params.append('customer_name', filters.customer_name || '');
 
     const response = await fetch(`${API_BASE_URL}/transactions/filtered?${params.toString()}`);
     if (!response.ok) {

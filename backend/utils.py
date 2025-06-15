@@ -51,14 +51,12 @@ def export_to_csv(data, data_type):
     return filename
 
 def export_to_pdf(data, data_type):
-    """Export data to PDF format"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{data_type}_export_{timestamp}.pdf"
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-    
+
     doc = SimpleDocTemplate(filepath, pagesize=A4, rightMargin=inch/2, leftMargin=inch/2, topMargin=inch/2, bottomMargin=inch/2)
     elements = []
-    
     styles = getSampleStyleSheet()
 
     if data_type == 'transactions':
@@ -72,91 +70,102 @@ def export_to_pdf(data, data_type):
                     elements.append(logo)
                 except Exception as e:
                     print(f"Could not load logo: {e}")
-
             firm_name_style = ParagraphStyle('FirmName', parent=styles['h1'], alignment=1)
             elements.append(Paragraph(firm_settings.firm_name, firm_name_style))
-            
             firm_details_style = ParagraphStyle('FirmDetails', parent=styles['Normal'], alignment=1, spaceBefore=6)
             elements.append(Paragraph(firm_settings.address, firm_details_style))
             elements.append(Paragraph(f"GST: {firm_settings.gst_number}", firm_details_style))
             elements.append(Spacer(1, 20))
-        
-        # Title
+
         title_style = ParagraphStyle('ReportTitle', parent=styles['h2'], alignment=1)
-        title = Paragraph(f"{data_type.title()} Report", title_style)
-        elements.append(title)
+        elements.append(Paragraph("Transactions Report", title_style))
         elements.append(Spacer(1, 12))
 
+        # Prepare single table of ALL bills (from transactions)
+        table_data = [
+            ['Bill No.', 'Date', 'Customer', 'Payment Type', 'Item Name', 'Item Type', 
+             'Weight (g)', 'Tunch (%)', 'Wastage (%)', 'Wages', 
+             'Silver Amount', 'Total Fine', 'Total Amount', 'Slip No.', 'Description', 'Transaction Type', 'Amount']
+        ]
         total_amount_credit = 0
         total_amount_debit = 0
         total_fine_credit = 0
         total_fine_debit = 0
 
-        for idx, transaction in enumerate(data, 1):
-            bill = getattr(transaction, 'bill', None)
-            customer = getattr(transaction, 'customer', None)
-
-            detail = []
-            # Bill details (show all but address/mobile)
+        for t in data:
+            bill = getattr(t, 'bill', None)
+            customer = getattr(t, 'customer', None)
+            # Only if there's a bill
             if bill:
-                bill_attrs = [
-                    ("Bill No.", f"BILL-{bill.bill_number:04d}"),
-                    ("Date", bill.date.strftime('%Y-%m-%d') if bill.date else "N/A"),
-                    ("Payment Type", bill.payment_type.title() if bill.payment_type else ""),
-                    ("Item Name", bill.item_name),
-                    ("Item Type", bill.item),
-                    ("Weight (g)", f"{bill.weight:.3f}"),
-                    ("Tunch (%)", f"{bill.tunch:.2f}"),
-                    ("Wastage (%)", f"{bill.wastage:.2f}"),
-                    ("Wages (per 1000)", f"{bill.wages:.2f}"),
-                    ("Silver Amount", f"₹{bill.silver_amount:,.2f}"),
-                    ("Total Fine (g)", f"{bill.total_fine:.3f}"),
-                    ("Total Amount", f"₹{bill.total_amount:,.2f}"),
-                    ("Slip No.", bill.slip_no or ""),
-                    ("Description", bill.description or ""),
+                row = [
+                    f"BILL-{bill.bill_number:04d}",
+                    bill.date.strftime('%Y-%m-%d') if bill.date else '',
+                    customer.name if customer else '',
+                    bill.payment_type.title() if bill.payment_type else '',
+                    bill.item_name or '',
+                    bill.item or '',
+                    f"{bill.weight:.3f}" if bill.weight is not None else '',
+                    f"{bill.tunch:.2f}" if bill.tunch is not None else '',
+                    f"{bill.wastage:.2f}" if bill.wastage is not None else '',
+                    f"{bill.wages:.2f}" if bill.wages is not None else '',
+                    f"₹{bill.silver_amount:,.2f}" if bill.silver_amount is not None else '',
+                    f"{bill.total_fine:.3f}" if bill.total_fine is not None else '',
+                    f"₹{bill.total_amount:,.2f}" if bill.total_amount is not None else '',
+                    bill.slip_no or '',
+                    bill.description or '',
+                    t.transaction_type.title(),
+                    f"₹{t.amount:,.2f}"
                 ]
-                for key, value in bill_attrs:
-                    if value not in (None, "", "N/A"):
-                        detail.append([key, value])
-                if customer:
-                    detail.insert(1, ("Customer", customer.name))
+                fine_val = bill.total_fine if bill and bill.total_fine is not None else 0
+                if t.transaction_type == 'credit':
+                    total_amount_credit += t.amount
+                    total_fine_credit += fine_val
+                elif t.transaction_type == 'debit':
+                    total_amount_debit += t.amount
+                    total_fine_debit += fine_val
+                table_data.append(row)
             else:
-                # No bill: show transaction-level summary
-                detail = [
-                    ("Transaction ID", transaction.id),
-                    ("Type", transaction.transaction_type.title()),
-                    ("Amount", f"₹{transaction.amount:,.2f}"),
-                    ("Description", transaction.description or "")
+                # For transaction with no bill, display only as much as possible
+                row = [
+                    "",  # Bill No.
+                    t.created_at.strftime('%Y-%m-%d'),
+                    customer.name if customer else '',
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    t.description or '',
+                    t.transaction_type.title(),
+                    f"₹{t.amount:,.2f}"
                 ]
-                if customer:
-                    detail.insert(1, ("Customer", customer.name))
-                detail.insert(0, ("Date", transaction.created_at.strftime('%Y-%m-%d')))
-            # Table for this transaction
-            elements.append(Spacer(1, 6))
-            elements.append(Paragraph(f"<b>Entry #{idx}</b>", styles['h4']))
-            t = Table(detail, colWidths=[2*inch, 3.2*inch])
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
-            ]))
-            elements.append(t)
-            elements.append(Spacer(1, 6))
+                if t.transaction_type == 'credit':
+                    total_amount_credit += t.amount
+                elif t.transaction_type == 'debit':
+                    total_amount_debit += t.amount
+                table_data.append(row)
 
-            # accumulate sums for summary
-            fine_val = bill.total_fine if bill and bill.total_fine is not None else 0
-            if transaction.transaction_type == 'credit':
-                total_amount_credit += transaction.amount
-                total_fine_credit += fine_val
-            elif transaction.transaction_type == 'debit':
-                total_amount_debit += transaction.amount
-                total_fine_debit += fine_val
-
+        table = Table(table_data, repeatRows=1)  # repeat header row on each page
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
+        ]))
+        elements.append(table)
         elements.append(Spacer(1, 24))
-        # Summary Section
+        # Summary Section (as before)
         net_total_amount = total_amount_credit - total_amount_debit
         net_total_fine = total_fine_credit - total_fine_debit
         summary_style = ParagraphStyle('Summary', parent=styles['Normal'], fontSize=12, spaceBefore=6)
