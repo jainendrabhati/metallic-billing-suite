@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,10 @@ const TransactionsPage = () => {
 
   const { data: transactions = [], refetch } = useQuery({
     queryKey: ['transactions', startDate, endDate, customerName],
-    queryFn: () => transactionAPI.getAll(),
+    queryFn: () =>
+      startDate || endDate || customerName
+        ? transactionAPI.getFiltered({ start_date: startDate, end_date: endDate, customer_name: customerName })
+        : transactionAPI.getAll(),
   });
 
   const updateTransactionMutation = useMutation({

@@ -1,4 +1,3 @@
-
 import csv
 import os
 import zipfile
@@ -88,59 +87,84 @@ def export_to_pdf(data, data_type):
         elements.append(title)
         elements.append(Spacer(1, 12))
 
-        # Table Data and Totals Calculation
-        table_data = [['Bill No.', 'Customer', 'Amount (INR)', 'Fine (g)', 'Type', 'Date']]
         total_amount_credit = 0
         total_amount_debit = 0
         total_fine_credit = 0
         total_fine_debit = 0
-        
-        for transaction in data:
-            fine_val = transaction.bill.total_fine if transaction.bill and transaction.bill.total_fine is not None else 0
-            
-            table_data.append([
-                f"BILL-{transaction.bill.bill_number:04d}" if transaction.bill else 'N/A',
-                transaction.customer.name if transaction.customer else 'N/A',
-                f"{transaction.amount:,.2f}",
-                f"{fine_val:.3f}",
-                transaction.transaction_type.title(),
-                transaction.created_at.strftime('%Y-%m-%d')
-            ])
 
+        for idx, transaction in enumerate(data, 1):
+            bill = getattr(transaction, 'bill', None)
+            customer = getattr(transaction, 'customer', None)
+
+            detail = []
+            # Bill details (show all but address/mobile)
+            if bill:
+                bill_attrs = [
+                    ("Bill No.", f"BILL-{bill.bill_number:04d}"),
+                    ("Date", bill.date.strftime('%Y-%m-%d') if bill.date else "N/A"),
+                    ("Payment Type", bill.payment_type.title() if bill.payment_type else ""),
+                    ("Item Name", bill.item_name),
+                    ("Item Type", bill.item),
+                    ("Weight (g)", f"{bill.weight:.3f}"),
+                    ("Tunch (%)", f"{bill.tunch:.2f}"),
+                    ("Wastage (%)", f"{bill.wastage:.2f}"),
+                    ("Wages (per 1000)", f"{bill.wages:.2f}"),
+                    ("Silver Amount", f"₹{bill.silver_amount:,.2f}"),
+                    ("Total Fine (g)", f"{bill.total_fine:.3f}"),
+                    ("Total Amount", f"₹{bill.total_amount:,.2f}"),
+                    ("Slip No.", bill.slip_no or ""),
+                    ("Description", bill.description or ""),
+                ]
+                for key, value in bill_attrs:
+                    if value not in (None, "", "N/A"):
+                        detail.append([key, value])
+                if customer:
+                    detail.insert(1, ("Customer", customer.name))
+            else:
+                # No bill: show transaction-level summary
+                detail = [
+                    ("Transaction ID", transaction.id),
+                    ("Type", transaction.transaction_type.title()),
+                    ("Amount", f"₹{transaction.amount:,.2f}"),
+                    ("Description", transaction.description or "")
+                ]
+                if customer:
+                    detail.insert(1, ("Customer", customer.name))
+                detail.insert(0, ("Date", transaction.created_at.strftime('%Y-%m-%d')))
+            # Table for this transaction
+            elements.append(Spacer(1, 6))
+            elements.append(Paragraph(f"<b>Entry #{idx}</b>", styles['h4']))
+            t = Table(detail, colWidths=[2*inch, 3.2*inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
+            ]))
+            elements.append(t)
+            elements.append(Spacer(1, 6))
+
+            # accumulate sums for summary
+            fine_val = bill.total_fine if bill and bill.total_fine is not None else 0
             if transaction.transaction_type == 'credit':
                 total_amount_credit += transaction.amount
                 total_fine_credit += fine_val
             elif transaction.transaction_type == 'debit':
                 total_amount_debit += transaction.amount
                 total_fine_debit += fine_val
-        
-        # Create table
-        table = Table(table_data, colWidths=[1.2*inch, 2*inch, 1.2*inch, 1.2*inch, 0.8*inch, 1*inch])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ]))
-        elements.append(table)
-        elements.append(Spacer(1, 24))
 
+        elements.append(Spacer(1, 24))
         # Summary Section
         net_total_amount = total_amount_credit - total_amount_debit
         net_total_fine = total_fine_credit - total_fine_debit
-        
         summary_style = ParagraphStyle('Summary', parent=styles['Normal'], fontSize=12, spaceBefore=6)
-        
         summary_title = Paragraph("<b>Summary</b>", styles['h3'])
         elements.append(summary_title)
         elements.append(Paragraph(f"<b>Net Total Amount:</b> ₹{net_total_amount:,.2f}", summary_style))
         elements.append(Paragraph(f"<b>Net Total Fine:</b> {net_total_fine:.3f} g", summary_style))
-    
+
     elif data_type == 'expenses':
         # Original expenses PDF code
         table_data = [['ID', 'Description', 'Amount', 'Category', 'Status', 'Date']]
@@ -347,7 +371,7 @@ def restore_database(zip_file_path):
                                         try:
                                             if 'T' in value:  # ISO format
                                                 data[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
-                                            else:
+                                            else:  # Simple date format
                                                 data[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
                                         except:
                                             pass  # Skip timestamp fields if invalid
