@@ -1,4 +1,3 @@
-
 from flask import Blueprint, request, jsonify
 from models import db, Employee, EmployeeSalary, EmployeePayment
 from datetime import datetime
@@ -143,6 +142,19 @@ def create_employee_payment():
         if 'payment_date' in data and isinstance(data['payment_date'], str):
             data['payment_date'] = datetime.strptime(data['payment_date'], '%Y-%m-%d').date()
         payment = EmployeePayment.create(**data)
+
+        # -- ADD: Create Expense log for this salary payment! --
+        from models import Expense, Employee
+        employee = Employee.query.get(data['employee_id'])
+        expense_data = {
+            'description': f"Salary payment to {employee.name if employee else 'Unknown Employee'}",
+            'amount': data['amount'],
+            'category': 'Salary',
+            'status': 'paid',
+            'date': data['payment_date']
+        }
+        Expense.create(**expense_data)
+
         return jsonify(payment.to_dict()), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -56,36 +56,36 @@ class Customer(db.Model):
 
     @classmethod
     def get_pending_customers(cls):
+        # MATCH LOGIC to what is used in /customers/pending-list
         customers = cls.get_all()
         pending_list = []
-        
         for customer in customers:
             credit_bills = Bill.query.filter_by(customer_id=customer.id, payment_type='credit').all()
             debit_bills = Bill.query.filter_by(customer_id=customer.id, payment_type='debit').all()
-            
+
             total_credit_fine = sum(bill.total_fine for bill in credit_bills)
             total_credit_amount = sum(bill.total_amount for bill in credit_bills)
-            
+
             total_debit_fine = sum(bill.total_fine for bill in debit_bills)
             total_debit_amount = sum(bill.total_amount for bill in debit_bills)
-            
-            pending_fine = total_credit_fine - total_debit_fine
-            pending_amount = total_credit_amount - total_debit_amount
-            
-            if pending_fine != 0 or pending_amount != 0:
+
+            remaining_fine = total_credit_fine - total_debit_fine
+            remaining_amount = total_credit_amount - total_debit_amount
+
+            if remaining_fine != 0 or remaining_amount != 0:
                 pending_list.append({
                     'customer_id': customer.id,
                     'customer_name': customer.name,
                     'customer_mobile': customer.mobile,
                     'customer_address': customer.address,
-                    'pending_fine': pending_fine,
-                    'pending_amount': pending_amount,
+                    'remaining_fine': remaining_fine,
+                    'remaining_amount': remaining_amount,
                     'total_credit_fine': total_credit_fine,
                     'total_credit_amount': total_credit_amount,
                     'total_debit_fine': total_debit_fine,
                     'total_debit_amount': total_debit_amount
                 })
-        
+
         return pending_list
 
 class Bill(db.Model):
