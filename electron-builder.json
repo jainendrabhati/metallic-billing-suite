@@ -20,7 +20,9 @@
   "main": "electron-main.cjs",
   "win": {
     "target": "nsis",
-    "publisherName": "Your Company Name",
+    "signtoolOptions": {
+      "publisherName": "Your Company Name"
+    },
     "sign": false
   },
   "nsis": {
