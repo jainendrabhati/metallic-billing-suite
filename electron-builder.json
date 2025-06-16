@@ -18,6 +18,7 @@
       "to": "backend"
     }
   ],
+  "main": "electron-main.js",
   "win": {
     "target": "nsis",
     "publisherName": "Your Company Name",
