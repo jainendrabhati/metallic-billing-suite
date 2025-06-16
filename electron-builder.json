@@ -8,7 +8,7 @@
   "files": [
     "dist/**/*",
     "backend/**/*",
-    "electron-main.js",
+    "electron-main.cjs",
     "package.json",
     "node_modules/**/*"
   ],
@@ -18,7 +18,7 @@
       "to": "backend"
     }
   ],
-  "main": "electron-main.js",
+  "main": "electron-main.cjs",
   "win": {
     "target": "nsis",
     "publisherName": "Your Company Name",
