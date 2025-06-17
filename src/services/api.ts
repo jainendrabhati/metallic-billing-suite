@@ -673,6 +673,43 @@ export const settingsAPI = {
     return response.json();
   },
 
+  getGoogleDriveSettings: async () => {
+    const response = await fetch(`${API_BASE_URL}/google-drive/settings`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch Google Drive settings");
+    }
+    return response.json();
+  },
+
+  updateGoogleDriveSettings: async (settingsData: any) => {
+    const response = await fetch(`${API_BASE_URL}/google-drive/settings`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(settingsData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to update Google Drive settings");
+    }
+    return response.json();
+  },
+
+  authenticateGoogleDrive: async (settingsData: any) => {
+    const response = await fetch(`${API_BASE_URL}/google-drive/authenticate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(settingsData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to authenticate Google Drive");
+    }
+    return response.json();
+  },
+
   downloadBackup: async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/backup/download`, {

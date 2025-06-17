@@ -1,11 +1,11 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Download, Upload, Save, Image } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Download, Upload, Save, Image, Clock, Mail } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
@@ -18,12 +18,23 @@ const SettingsPage = () => {
     firmLogo: null as File | null,
   });
 
+  const [googleDriveSettings, setGoogleDriveSettings] = useState({
+    email: "",
+    backupTime: "20:00", // Default 8 PM
+    autoBackupEnabled: false,
+  });
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: settings } = useQuery({
     queryKey: ['firmSettings'],
     queryFn: settingsAPI.getFirmSettings,
+  });
+
+  const { data: driveSettings } = useQuery({
+    queryKey: ['googleDriveSettings'],
+    queryFn: settingsAPI.getGoogleDriveSettings,
   });
 
   useEffect(() => {
@@ -36,6 +47,16 @@ const SettingsPage = () => {
       });
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (driveSettings) {
+      setGoogleDriveSettings({
+        email: driveSettings.email || "",
+        backupTime: driveSettings.backup_time || "20:00",
+        autoBackupEnabled: driveSettings.auto_backup_enabled || false,
+      });
+    }
+  }, [driveSettings]);
 
   const updateSettingsMutation = useMutation({
     mutationFn: settingsAPI.updateFirmSettings,
@@ -50,6 +71,42 @@ const SettingsPage = () => {
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const authenticateGoogleDriveMutation = useMutation({
+    mutationFn: settingsAPI.authenticateGoogleDrive,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['googleDriveSettings'] });
+      toast({
+        title: "Success",
+        description: "Google Drive authenticated successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to authenticate Google Drive.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateGoogleDriveSettingsMutation = useMutation({
+    mutationFn: settingsAPI.updateGoogleDriveSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['googleDriveSettings'] });
+      toast({
+        title: "Success",
+        description: "Google Drive settings updated successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update Google Drive settings.",
         variant: "destructive",
       });
     },
@@ -121,6 +178,31 @@ const SettingsPage = () => {
       firm_name: firmSettings.firmName,
       gst_number: firmSettings.gstNumber,
       address: firmSettings.address,
+    });
+  };
+
+  const handleAuthenticateGoogleDrive = () => {
+    if (!googleDriveSettings.email) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    authenticateGoogleDriveMutation.mutate({
+      email: googleDriveSettings.email,
+      backup_time: googleDriveSettings.backupTime,
+      auto_backup_enabled: googleDriveSettings.autoBackupEnabled,
+    });
+  };
+
+  const handleSaveGoogleDriveSettings = () => {
+    updateGoogleDriveSettingsMutation.mutate({
+      email: googleDriveSettings.email,
+      backup_time: googleDriveSettings.backupTime,
+      auto_backup_enabled: googleDriveSettings.autoBackupEnabled,
     });
   };
 
@@ -217,7 +299,87 @@ const SettingsPage = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Data Backup & Restore</CardTitle>
+            <CardTitle>Google Drive Auto Backup</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="googleEmail" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Google Drive Email
+              </Label>
+              <Input
+                id="googleEmail"
+                type="email"
+                value={googleDriveSettings.email}
+                onChange={(e) => setGoogleDriveSettings(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="Enter your Google account email"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="backupTime" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Daily Backup Time
+              </Label>
+              <Input
+                id="backupTime"
+                type="time"
+                value={googleDriveSettings.backupTime}
+                onChange={(e) => setGoogleDriveSettings(prev => ({ ...prev, backupTime: e.target.value }))}
+                className="mt-1"
+              />
+              <p className="text-sm text-gray-600 mt-1">
+                Automatic backup will run daily at this time
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="autoBackup" className="text-sm font-medium">
+                Enable Auto Backup
+              </Label>
+              <Switch
+                id="autoBackup"
+                checked={googleDriveSettings.autoBackupEnabled}
+                onCheckedChange={(checked) => 
+                  setGoogleDriveSettings(prev => ({ ...prev, autoBackupEnabled: checked }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Button 
+                onClick={handleAuthenticateGoogleDrive}
+                className="w-full flex items-center gap-2"
+                disabled={authenticateGoogleDriveMutation.isPending || !googleDriveSettings.email}
+              >
+                <Mail className="h-4 w-4" />
+                {authenticateGoogleDriveMutation.isPending ? "Authenticating..." : "Authenticate & Setup"}
+              </Button>
+              
+              <Button 
+                onClick={handleSaveGoogleDriveSettings}
+                variant="outline"
+                className="w-full"
+                disabled={updateGoogleDriveSettingsMutation.isPending}
+              >
+                {updateGoogleDriveSettingsMutation.isPending ? "Saving..." : "Save Settings"}
+              </Button>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-800 mb-1">📁 Auto Backup Feature</h4>
+              <p className="text-sm text-blue-700">
+                Once authenticated, your database will be automatically backed up to Google Drive 
+                daily at the specified time. The backup includes all your data in CSV format.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Manual Data Backup & Restore</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
