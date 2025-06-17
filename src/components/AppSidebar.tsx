@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 const items = [
   {
     title: "Dashboard",
-    url: "/dashboard",
+    url: "/",
     icon: BarChart3,
   },
   {

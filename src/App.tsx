@@ -35,8 +35,8 @@ function App() {
             <AppSidebar />
             <main className="flex-1">
               <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/dashboard" element={<Dashboard />} />
+                
+                <Route path="/" element={<Dashboard />} />
                 <Route path="/billing" element={<BillingPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/pending-list" element={<PendingListPage />} />

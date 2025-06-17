@@ -1,0 +1,35 @@
+{
+  "appId": "com.yourcompany.jewelryapp",
+  "productName": "Jewelry Management System",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "backend/**/*",
+    "electron-main.cjs",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "backend",
+      "to": "backend"
+    }
+  ],
+  "main": "electron-main.cjs",
+  "win": {
+    "target": "nsis",
+    "signtoolOptions": {
+      "publisherName": "Your Company Name"
+    },
+    "sign": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  },
+  "nodeGypRebuild": false,
+  "buildDependenciesFromSource": false
+}

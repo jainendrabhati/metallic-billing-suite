@@ -1,0 +1,8 @@
+Customer Name,Item Name,Weight,Silver Amount,Total Fine,Total Amount,Bill Type,Date
+Kamal,Fine,2960.000,0.00,2960.000,0.00,Credit,2025-06-12
+Kamal,Parrot,2260.000,0.00,2180.900,2260.00,Debit,2025-06-12
+manish,KTR,210.000,0.00,178.500,0.00,Credit,2025-06-12
+manish,Peacock,652.000,0.00,580.280,0.00,Debit,2025-06-12
+Aman,Silver Elephant,1500.000,0.00,1447.500,750.00,Debit,2025-06-12
+Aman,Silver cow,2000.000,0.00,1930.000,2000.00,Credit,2025-06-12
+Aman,Silver Cow,2000.000,0.00,1930.000,2000.00,Debit,2025-06-12

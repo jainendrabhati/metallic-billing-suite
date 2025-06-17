@@ -25,10 +25,22 @@ const TransactionsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: transactions = [], refetch } = useQuery({
+  const { data: transactions = [], refetch, isError, error } = useQuery({
     queryKey: ['transactions', startDate, endDate, customerName],
-    queryFn: () => transactionAPI.getAll(),
+    queryFn: () => {
+      // If any filters are set, call getFiltered
+      if (startDate || endDate || customerName) {
+        return transactionAPI.getFiltered({ start_date: startDate, end_date: endDate, customer_name: customerName });
+      } else {
+        return transactionAPI.getAll();
+      }
+    },
   });
+
+  // Optional: Show errors for debugging
+  if (isError) {
+    console.error("Transaction query error:", error);
+  }
 
   const updateTransactionMutation = useMutation({
     mutationFn: (data: { id: number; updates: any }) => {
@@ -111,19 +123,35 @@ const TransactionsPage = () => {
 
   const handleExportCSV = async () => {
     try {
-      const result = await transactionAPI.exportCSV({ start_date: startDate, end_date: endDate, customer_name: customerName });
-      console.log("CSV export:", result);
+      await transactionAPI.exportCSV({ start_date: startDate, end_date: endDate, customer_name: customerName });
+      toast({
+        title: "Success",
+        description: "Transactions data is being downloaded.",
+      });
     } catch (error) {
       console.error("Failed to export CSV:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export transactions to CSV.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleExportPDF = async () => {
     try {
-      const result = await transactionAPI.exportPDF({ start_date: startDate, end_date: endDate, customer_name: customerName });
-      console.log("PDF export:", result);
+      await transactionAPI.exportPDF({ start_date: startDate, end_date: endDate, customer_name: customerName });
+      toast({
+        title: "Success",
+        description: "Transactions PDF is being generated for download.",
+      });
     } catch (error) {
       console.error("Failed to export PDF:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export transactions to PDF.",
+        variant: "destructive",
+      });
     }
   };
 

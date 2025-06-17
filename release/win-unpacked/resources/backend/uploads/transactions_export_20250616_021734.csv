@@ -1,0 +1,8 @@
+Transaction ID,Bill Number,Customer Name,Amount,Type,Date,Description
+7,BILL-0007,Kamal,0.0,credit,2025-06-12 18:30:13,Bill #202506120007 - Fine
+6,BILL-0006,Kamal,2260.0,debit,2025-06-12 18:29:23,Bill #202506120006 - Parrot
+5,BILL-0005,manish,0.0,credit,2025-06-12 18:27:33,Bill #202506120005 - KTR
+4,BILL-0004,manish,0.0,debit,2025-06-12 18:26:40,Bill #202506120004 - Peacock
+3,BILL-0003,Aman,750.0,debit,2025-06-12 17:11:06,Bill #202506120003 - Silver Elephant
+2,BILL-0002,Aman,2000.0,credit,2025-06-12 17:09:02,Bill #202506120002 - Silver cow
+1,BILL-0001,Aman,2000.0,debit,2025-06-12 17:07:38,Bill #202506120001 - Silver Cow

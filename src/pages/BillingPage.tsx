@@ -43,7 +43,7 @@ const BillingPage = () => {
 
   // Calculated values
   const totalFine = weight && tunch && wastage ? 
-    parseFloat(weight) * ((parseFloat(tunch) - parseFloat(wastage)) / 100) : 0;
+    parseFloat(weight) * ((parseFloat(tunch) + parseFloat(wastage)) / 100) : 0;
   const totalAmount = (weight && wages ? parseFloat(weight) * (parseFloat(wages) / 1000) : 0) + 
                      (paymentType === 'credit' && silverAmount ? parseFloat(silverAmount) : 0);
 

@@ -1,8 +1,14 @@
-
-from flask import Blueprint, request, jsonify
-from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, FirmSettings
+from flask import Blueprint, request, jsonify, send_file, current_app
+from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, FirmSettings, GoogleDriveSettings
+from utils import backup_database, restore_database
+from google_drive_service import google_drive_service, schedule_backup, setup_backup_scheduler
+import os
+from werkzeug.utils import secure_filename
 
 dashboard_bp = Blueprint('dashboard', __name__)
+
+# Initialize backup scheduler when module loads
+setup_backup_scheduler()
 
 # Settings APIs
 @dashboard_bp.route('/settings', methods=['GET'])
@@ -22,20 +28,153 @@ def update_settings():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Google Drive Settings APIs
+@dashboard_bp.route('/google-drive/settings', methods=['GET'])
+def get_google_drive_settings():
+    try:
+        settings = GoogleDriveSettings.query.first()
+        if not settings:
+            settings = GoogleDriveSettings()
+            db.session.add(settings)
+            db.session.commit()
+        return jsonify(settings.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@dashboard_bp.route('/google-drive/settings', methods=['PUT'])
+def update_google_drive_settings():
+    try:
+        data = request.get_json()
+        settings = GoogleDriveSettings.query.first()
+        
+        if not settings:
+            settings = GoogleDriveSettings()
+            db.session.add(settings)
+        
+        if 'email' in data:
+            settings.email = data['email']
+        if 'backup_time' in data:
+            settings.backup_time = data['backup_time']
+        if 'auto_backup_enabled' in data:
+            settings.auto_backup_enabled = data['auto_backup_enabled']
+        
+        db.session.commit()
+        
+        # Update backup schedule if enabled
+        if settings.auto_backup_enabled and settings.backup_time:
+            schedule_backup(settings.backup_time)
+        
+        return jsonify(settings.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@dashboard_bp.route('/google-drive/authenticate', methods=['POST'])
+def authenticate_google_drive():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        backup_time = data.get('backup_time', '20:00')
+        auto_backup_enabled = data.get('auto_backup_enabled', False)
+        
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+        
+        # Authenticate with Google Drive
+        success = google_drive_service.authenticate(email)
+        
+        if not success:
+            return jsonify({'error': 'Failed to authenticate with Google Drive. Please ensure you have proper credentials setup.'}), 400
+        
+        # Save or update settings
+        settings = GoogleDriveSettings.query.first()
+        if not settings:
+            settings = GoogleDriveSettings()
+            db.session.add(settings)
+        
+        settings.email = email
+        settings.backup_time = backup_time
+        settings.auto_backup_enabled = auto_backup_enabled
+        settings.authenticated = True
+        
+        db.session.commit()
+        
+        # Setup backup schedule
+        if auto_backup_enabled:
+            schedule_backup(backup_time)
+        
+        return jsonify({
+            'message': 'Google Drive authenticated successfully',
+            'settings': settings.to_dict()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # Backup APIs
 @dashboard_bp.route('/backup/download', methods=['GET'])
 def download_backup():
     try:
-        return jsonify({'message': 'Backup downloaded'}), 200
+        print("Starting backup process...")
+        
+        # Create backup ZIP file
+        zip_filename = backup_database()
+        zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
+        
+        print(f"Backup created: {zip_filepath}")
+        
+        # Check if file exists
+        if not os.path.exists(zip_filepath):
+            print(f"Backup file not found at: {zip_filepath}")
+            return jsonify({'error': 'Backup file not found'}), 404
+        
+        print(f"Sending file: {zip_filepath}")
+        
+        # Send file for download with proper headers
+        return send_file(
+            zip_filepath,
+            as_attachment=True,
+            download_name=zip_filename,
+            mimetype='application/zip'
+        )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Backup error: {str(e)}")
+        return jsonify({'error': f'Backup failed: {str(e)}'}), 500
 
 @dashboard_bp.route('/backup/upload', methods=['POST'])
 def upload_backup():
     try:
-        return jsonify({'message': 'Backup uploaded'}), 200
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.zip'):
+            return jsonify({'error': 'Please upload a valid ZIP file'}), 400
+        
+        # Save uploaded file temporarily
+        filename = secure_filename(file.filename)
+        temp_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], f"temp_{filename}")
+        file.save(temp_filepath)
+        
+        try:
+            # Restore database from ZIP file
+            restore_database(temp_filepath)
+            
+            # Clean up temporary file
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+            
+            return jsonify({'message': 'Database restored successfully'}), 200
+        except Exception as restore_error:
+            # Clean up temporary file if restore fails
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+            return jsonify({'error': f'Restore failed: {str(restore_error)}'}), 500
+            
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 # Dashboard API
 @dashboard_bp.route('/dashboard', methods=['GET'])
