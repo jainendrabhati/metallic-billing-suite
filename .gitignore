@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+release/win-unpacked/Jewelry Management System.exe
+release/win-unpacked/resources/app.asar
+
