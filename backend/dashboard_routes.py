@@ -1,6 +1,10 @@
 
 from flask import Blueprint, request, jsonify, send_file, current_app
+<<<<<<< HEAD
 from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, Settings, GoogleDriveSettings
+=======
+from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, FirmSettings, GoogleDriveSettings
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
 from utils import backup_database, restore_database
 from google_drive_service import google_drive_service, schedule_backup, setup_backup_scheduler
 import os
@@ -80,18 +84,26 @@ def authenticate_google_drive():
         if not email:
             return jsonify({'error': 'Email is required'}), 400
         
+<<<<<<< HEAD
         # Clear any existing authentication to force re-authentication with new email
         token_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'gdrive_token.pickle')
         if os.path.exists(token_path):
             os.remove(token_path)
         
         # Authenticate with Google Drive using the provided email
+=======
+        # Authenticate with Google Drive
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         success = google_drive_service.authenticate(email)
         
         if not success:
             return jsonify({'error': 'Failed to authenticate with Google Drive. Please ensure you have proper credentials setup.'}), 400
         
+<<<<<<< HEAD
         # Save or update settings with the new email
+=======
+        # Save or update settings
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         settings = GoogleDriveSettings.query.first()
         if not settings:
             settings = GoogleDriveSettings()
@@ -100,23 +112,37 @@ def authenticate_google_drive():
         settings.email = email
         settings.backup_time = backup_time
         settings.auto_backup_enabled = auto_backup_enabled
+<<<<<<< HEAD
+=======
+        settings.authenticated = True
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         
         db.session.commit()
         
         # Setup backup schedule
         if auto_backup_enabled:
+<<<<<<< HEAD
             schedule_backup(settings.backup_time)
         
         return jsonify({
             'message': f'Google Drive authenticated successfully for {email}',
+=======
+            schedule_backup(backup_time)
+        
+        return jsonify({
+            'message': 'Google Drive authenticated successfully',
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
             'settings': settings.to_dict()
         }), 200
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+<<<<<<< HEAD
 # ... keep existing code (backup APIs and dashboard API)
 
+=======
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
 # Backup APIs
 @dashboard_bp.route('/backup/download', methods=['GET'])
 def download_backup():

@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 import os
 import pickle
 import json
 from app import app
+=======
+
+import os
+import pickle
+import json
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
 from datetime import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -22,6 +29,7 @@ class GoogleDriveService:
     def __init__(self):
         self.service = None
         self.credentials = None
+<<<<<<< HEAD
         self.current_email = None
         
     def authenticate(self, email, credentials_json=None):
@@ -32,6 +40,16 @@ class GoogleDriveService:
             token_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), f'gdrive_token_{email}.pickle')
             
             # Load existing credentials if available for this email
+=======
+        
+    def authenticate(self, email, credentials_json=None):
+        """Authenticate with Google Drive using OAuth2"""
+        try:
+            creds = None
+            token_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'gdrive_token.pickle')
+            
+            # Load existing credentials if available
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
             if os.path.exists(token_path):
                 with open(token_path, 'rb') as token:
                     creds = pickle.load(token)
@@ -42,19 +60,32 @@ class GoogleDriveService:
                     creds.refresh(Request())
                 else:
                     # You need to provide credentials.json file from Google Cloud Console
+<<<<<<< HEAD
                     credentials_file = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'credentials.json')
                     
                     if not os.path.exists(credentials_file):
+=======
+                    # This would typically be downloaded from Google Cloud Console
+                    credentials_file = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'credentials.json')
+                    
+                    if not os.path.exists(credentials_file):
+                        # Create a basic credentials structure - user needs to provide their own
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
                         raise Exception("Google Drive credentials not found. Please provide credentials.json file.")
                     
                     flow = InstalledAppFlow.from_client_secrets_file(credentials_file, SCOPES)
                     creds = flow.run_local_server(port=0)
                 
+<<<<<<< HEAD
                 # Save credentials for this email
+=======
+                # Save credentials for next run
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
                 with open(token_path, 'wb') as token:
                     pickle.dump(creds, token)
             
             self.credentials = creds
+<<<<<<< HEAD
             self.current_email = email
             self.service = build('drive', 'v3', credentials=creds)
             
@@ -67,15 +98,31 @@ class GoogleDriveService:
     
     def upload_backup(self, file_path, filename):
         """Upload backup file to Google Drive for current authenticated user"""
+=======
+            self.service = build('drive', 'v3', credentials=creds)
+            return True
+            
+        except Exception as e:
+            print(f"Authentication error: {str(e)}")
+            return False
+    
+    def upload_backup(self, file_path, filename):
+        """Upload backup file to Google Drive"""
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         try:
             if not self.service:
                 raise Exception("Google Drive not authenticated")
             
+<<<<<<< HEAD
             if not self.current_email:
                 raise Exception("No authenticated email found")
             
             # Create folder for backups if it doesn't exist
             folder_name = f"Metalic Jewelry Backups - {self.current_email}"
+=======
+            # Create folder for backups if it doesn't exist
+            folder_name = "Metalic Jewelry Backups"
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
             folder_id = self._get_or_create_folder(folder_name)
             
             file_metadata = {
@@ -90,11 +137,19 @@ class GoogleDriveService:
                 fields='id'
             ).execute()
             
+<<<<<<< HEAD
             print(f"Backup uploaded to Google Drive for {self.current_email}: {file.get('id')}")
             return file.get('id')
             
         except Exception as e:
             print(f"Upload error for {self.current_email}: {str(e)}")
+=======
+            print(f"Backup uploaded to Google Drive: {file.get('id')}")
+            return file.get('id')
+            
+        except Exception as e:
+            print(f"Upload error: {str(e)}")
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
             raise e
     
     def _get_or_create_folder(self, folder_name):
@@ -128,13 +183,18 @@ google_drive_service = GoogleDriveService()
 
 def perform_auto_backup():
     """Perform automatic backup to Google Drive"""
+<<<<<<< HEAD
     
     with app.app_context():
     
+=======
+    try:
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         print("Starting automatic backup...")
         
         # Get Google Drive settings
         settings = GoogleDriveSettings.query.first()
+<<<<<<< HEAD
         if not settings or not settings.auto_backup_enabled or not settings.email:
             print("Auto backup not enabled or email not configured")
             return
@@ -142,6 +202,15 @@ def perform_auto_backup():
         # Authenticate with Google Drive for the configured email
         if not google_drive_service.authenticate(settings.email):
             print(f"Failed to authenticate with Google Drive for {settings.email}")
+=======
+        if not settings or not settings.auto_backup_enabled:
+            print("Auto backup not enabled")
+            return
+        
+        # Authenticate with Google Drive
+        if not google_drive_service.authenticate(settings.email):
+            print("Failed to authenticate with Google Drive")
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
             return
         
         # Create backup
@@ -151,17 +220,27 @@ def perform_auto_backup():
         # Upload to Google Drive
         file_id = google_drive_service.upload_backup(zip_filepath, zip_filename)
         
+<<<<<<< HEAD
         # Update last backup time
         settings.last_backup = datetime.utcnow()
         db.session.commit()
         
+=======
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         # Clean up local file
         if os.path.exists(zip_filepath):
             os.remove(zip_filepath)
         
+<<<<<<< HEAD
         print(f"Auto backup completed successfully for {settings.email}: {file_id}")
         
     
+=======
+        print(f"Auto backup completed successfully: {file_id}")
+        
+    except Exception as e:
+        print(f"Auto backup failed: {str(e)}")
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
 
 def setup_backup_scheduler():
     """Setup the backup scheduler"""
@@ -178,4 +257,8 @@ def schedule_backup(backup_time):
     """Schedule daily backup at specified time"""
     schedule.clear()  # Clear existing schedules
     schedule.every().day.at(backup_time).do(perform_auto_backup)
+<<<<<<< HEAD
     print(f"Backup scheduled daily at {backup_time}")
+=======
+    print(f"Backup scheduled daily at {backup_time}")
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447

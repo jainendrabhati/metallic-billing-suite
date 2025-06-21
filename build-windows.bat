@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
 @echo off
 echo Cleaning old builds...
 if exist "dist" rmdir /s /q "dist"
@@ -14,4 +18,8 @@ npx electron-builder --config electron-builder.json --win --publish=never
 
 echo Build complete! Check the 'release' folder for your .exe installer
 echo Note: The .exe is unsigned, which is normal for development builds
+<<<<<<< HEAD
 pause
+=======
+pause
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447

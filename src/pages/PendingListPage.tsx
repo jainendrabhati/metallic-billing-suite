@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
 import { ChevronDown, ChevronUp, Clock, Users, TrendingUp, TrendingDown, Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { customerAPI, settingsAPI } from "@/services/api";
+
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -12,6 +14,7 @@ const PendingListPage = () => {
   const [expandedCustomers, setExpandedCustomers] = useState<Set<number>>(new Set());
 
   const { data: pendingCustomers = [], isLoading } = useQuery({
+
     queryKey: ['customers', 'pending'],
     queryFn: customerAPI.getPendingList,
   });
@@ -21,6 +24,7 @@ const PendingListPage = () => {
     queryFn: settingsAPI.getFirmSettings,
   });
 
+
   const toggleCustomerExpansion = (customerId: number) => {
     const newExpanded = new Set(expandedCustomers);
     if (newExpanded.has(customerId)) {
@@ -29,6 +33,7 @@ const PendingListPage = () => {
       newExpanded.add(customerId);
     }
     setExpandedCustomers(newExpanded);
+
   };
 
   const { data: customerBills = {} } = useQuery({
@@ -126,7 +131,20 @@ const PendingListPage = () => {
       printWindow.print();
       printWindow.close();
     }
+
   };
+
+  const { data: customerBills = {} } = useQuery({
+    queryKey: ['customer-bills', Array.from(expandedCustomers)],
+    queryFn: async () => {
+      const billsData: { [key: number]: any[] } = {};
+      for (const customerId of expandedCustomers) {
+        billsData[customerId] = await customerAPI.getCustomerBills(customerId);
+      }
+      return billsData;
+    },
+    enabled: expandedCustomers.size > 0,
+  });
 
   if (isLoading) {
     return (
@@ -145,10 +163,12 @@ const PendingListPage = () => {
             <p className="text-gray-600 text-sm">Customers with outstanding balances</p>
           </div>
           <div className="flex items-center gap-4">
+
             <Button onClick={handleDownloadPDF} className="flex items-center gap-2">
               <Download className="h-4 w-4" />
               Download PDF
             </Button>
+
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">{pendingCustomers.length}</div>
               <div className="text-sm text-gray-500">Pending Customers</div>
@@ -180,7 +200,9 @@ const PendingListPage = () => {
                           <div className="text-sm text-gray-700">{customer.customer_address}</div>
                           <div className="text-center">
                             <div className={`font-bold ${customer.remaining_fine >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+
                               {customer.remaining_fine.toFixed(2)}g
+
                             </div>
                             <div className="text-xs text-gray-500">Remaining Fine</div>
                           </div>
@@ -190,7 +212,8 @@ const PendingListPage = () => {
                             </div>
                             <div className="text-xs text-gray-500">Remaining Amount</div>
                           </div>
-                          
+
+                  
                           <div className="flex justify-center">
                             <Button
                               variant="ghost"
@@ -217,7 +240,9 @@ const PendingListPage = () => {
                           <div>
                             <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                               <TrendingUp className="h-4 w-4 text-green-600" />
+
                               Credit Bills (Total: {customer.total_credit_fine.toFixed(2)}g, ₹{customer.total_credit_amount.toLocaleString()})
+
                             </h4>
                             <div className="space-y-2 max-h-40 overflow-y-auto">
                               {customerBills[customer.customer_id]?.filter((bill: any) => bill.payment_type === 'credit').map((bill: any) => (
@@ -228,7 +253,9 @@ const PendingListPage = () => {
                                       <div className="text-xs text-gray-600">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
                                     </div>
                                     <div className="text-right">
+
                                       <div className="text-sm font-semibold text-green-700">{bill.total_fine.toFixed(2)}g</div>
+
                                       <div className="text-sm text-green-600">₹{bill.total_amount.toFixed(2)}</div>
                                     </div>
                                   </div>

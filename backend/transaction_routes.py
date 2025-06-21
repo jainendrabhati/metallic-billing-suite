@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
 from flask import Blueprint, request, jsonify, send_from_directory, current_app
 from models import db, Transaction, Bill, Stock
 
@@ -45,7 +48,11 @@ def get_filtered_transactions():
 
 @transaction_bp.route('/transactions/export/csv', methods=['GET'])
 def export_transactions_csv():
+<<<<<<< HEAD
     # try:
+=======
+    try:
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         from utils import export_to_csv
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
@@ -63,6 +70,7 @@ def export_transactions_csv():
             filename, 
             as_attachment=True
         )
+<<<<<<< HEAD
     # except Exception as e:
     #     print(f"Error exporting transactions to CSV: {e}")
     #     return jsonify({'error': str(e)}), 500
@@ -70,13 +78,28 @@ def export_transactions_csv():
 @transaction_bp.route('/transactions/export/pdf', methods=['GET'])
 def export_transactions_pdf():
     # try:
+=======
+    except Exception as e:
+        print(f"Error exporting transactions to CSV: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@transaction_bp.route('/transactions/export/pdf', methods=['GET'])
+def export_transactions_pdf():
+    try:
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         from utils import export_to_pdf
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         customer_name = request.args.get('customer_name')
+<<<<<<< HEAD
         print(1)
         transactions = Transaction.get_filtered(start_date, end_date, customer_name)
         print(2)
+=======
+        
+        transactions = Transaction.get_filtered(start_date, end_date, customer_name)
+        
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
         if not transactions:
             return jsonify({'message': 'No transactions found for the selected criteria.'}), 404
             
@@ -87,9 +110,15 @@ def export_transactions_pdf():
             filename, 
             as_attachment=True
         )
+<<<<<<< HEAD
     # except Exception as e:
     #     print(f"Error exporting transactions to PDF: {e}")
     #     return jsonify({'error': str(e)}), 500
+=======
+    except Exception as e:
+        print(f"Error exporting transactions to PDF: {e}")
+        return jsonify({'error': str(e)}), 500
+>>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
 
 @transaction_bp.route('/transactions/<int:transaction_id>', methods=['PUT'])
 def update_transaction(transaction_id):

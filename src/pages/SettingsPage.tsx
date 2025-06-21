@@ -9,6 +9,7 @@ import { Download, Upload, Save, Image, Clock, Mail, Building2 } from "lucide-re
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import GoogleDriveSettings from "@/components/GoogleDriveSettings";
 
 const SettingsPage = () => {
   const [firmSettings, setFirmSettings] = useState({
@@ -198,12 +199,16 @@ const SettingsPage = () => {
           </CardContent>
         </Card>
 
+        <GoogleDriveSettings />
+
         <Card>
           <CardHeader>
+
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
               Banking Details
             </CardTitle>
+
           </CardHeader>
           <CardContent className="space-y-4">
             {[
