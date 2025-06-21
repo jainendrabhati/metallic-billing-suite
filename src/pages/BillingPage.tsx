@@ -28,11 +28,11 @@ const BillingPage = () => {
   const [address, setAddress] = useState("");
   const [itemName, setItemName] = useState("");
   const [item, setItem] = useState("");
-  const [weight, setWeight] = useState("");
-  const [tunch, setTunch] = useState("");
-  const [wages, setWages] = useState("");
-  const [wastage, setWastage] = useState("");
-  const [silverAmount, setSilverAmount] = useState("");
+  const [weight, setWeight] = useState("0");
+  const [tunch, setTunch] = useState("0");
+  const [wages, setWages] = useState("0");
+  const [wastage, setWastage] = useState("0");
+  const [silverAmount, setSilverAmount] = useState("0");
   const [slipNo, setSlipNo] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [paymentType, setPaymentType] = useState<"credit" | "debit">("credit");
@@ -40,6 +40,7 @@ const BillingPage = () => {
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [selectedBillForPrint, setSelectedBillForPrint] = useState<Bill | null>(null);
+  
 
   // Calculated values
   const totalFine = weight && tunch && wastage ? 
@@ -189,9 +190,9 @@ const BillingPage = () => {
         item_name: itemName,
         item,
         weight: parseFloat(weight),
-        tunch: parseFloat(tunch),
-        wages: parseFloat(wages),
-        wastage: parseFloat(wastage),
+        tunch: parseFloat(tunch || "0"),
+        wages: parseFloat(wages || "0"),
+        wastage: parseFloat(wastage || "0"),
         silver_amount: parseFloat(silverAmount || "0"),
         payment_type: paymentType,
         slip_no: slipNo,
@@ -356,6 +357,7 @@ const BillingPage = () => {
                           id="weight"
                           type="number"
                           step="0.01"
+                          defaultValue={0}
                           value={weight}
                           onChange={(e) => setWeight(e.target.value)}
                           placeholder="0.00"
@@ -367,21 +369,10 @@ const BillingPage = () => {
                         <Input
                           id="tunch"
                           type="number"
+                          
                           step="0.01"
                           value={tunch}
                           onChange={(e) => setTunch(e.target.value)}
-                          placeholder="0.00"
-                          className="border-gray-300 focus:border-blue-500 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="wages" className="text-sm">Wages *</Label>
-                        <Input
-                          id="wages"
-                          type="number"
-                          step="0.01"
-                          value={wages}
-                          onChange={(e) => setWages(e.target.value)}
                           placeholder="0.00"
                           className="border-gray-300 focus:border-blue-500 text-sm"
                         />
@@ -391,20 +382,35 @@ const BillingPage = () => {
                         <Input
                           id="wastage"
                           type="number"
-                          step="0.01"
+                          defaultValue={0}
                           value={wastage}
                           onChange={(e) => setWastage(e.target.value)}
                           placeholder="0.00"
                           className="border-gray-300 focus:border-blue-500 text-sm"
                         />
                       </div>
+                      {paymentType === 'debit' && (
+                      <div>
+                        <Label htmlFor="wages" className="text-sm">Wages *</Label>
+                        <Input
+                          id="wages"
+                          type="number"
+                          
+                          value={wages}
+                          onChange={(e) => setWages(e.target.value)}
+                          placeholder="0.00"
+                          className="border-gray-300 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+                      )}
+                      
                       {paymentType === 'credit' && (
                         <div>
-                          <Label htmlFor="silverAmount" className="text-sm">Silver Amount</Label>
+                          <Label htmlFor="silverAmount" className="text-sm">Amount</Label>
                           <Input
                             id="silverAmount"
                             type="number"
-                            step="0.01"
+                            
                             value={silverAmount}
                             onChange={(e) => setSilverAmount(e.target.value)}
                             placeholder="0.00"
@@ -434,7 +440,7 @@ const BillingPage = () => {
                       <div>
                         <Label className="text-sm">Total Fine (grams)</Label>
                         <Input
-                          value={totalFine.toFixed(4)}
+                          value={totalFine.toFixed(2)}
                           readOnly
                           className="bg-white font-semibold text-blue-600 text-sm"
                         />
@@ -488,7 +494,7 @@ const BillingPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-3">
-                <div className="space-y-2">
+                <div className="space-y-2 m-5">
                   {bills.slice(0, 10).map((bill) => (
                     <div key={bill.id} className="p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
                       <div className="flex justify-between items-start">

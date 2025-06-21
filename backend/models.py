@@ -521,7 +521,7 @@ class Expense(db.Model):
     amount = db.Column(db.Float, nullable=False)
     category = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(20), default='pending')  # paid/pending
-    date = db.Column(db.Date, nullable=False)
+    date = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -592,6 +592,57 @@ class BillItem(db.Model):
         db.session.commit()
         return item
 
+class Settings(db.Model):
+    __tablename__ = 'settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    firm_name = db.Column(db.String(200))
+    gst_number = db.Column(db.String(50))
+    address = db.Column(db.Text)
+    city = db.Column(db.String(100))
+    account_number = db.Column(db.String(50))
+    account_holder_name = db.Column(db.String(200))
+    ifsc_code = db.Column(db.String(20))
+    branch_address = db.Column(db.Text)
+    logo_path = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'firm_name': self.firm_name,
+            'gst_number': self.gst_number,
+            'address': self.address,
+            'city': self.city,
+            'account_number': self.account_number,
+            'account_holder_name': self.account_holder_name,
+            'ifsc_code': self.ifsc_code,
+            'branch_address': self.branch_address,
+            'logo_path': self.logo_path,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def get_settings(cls):
+        settings = cls.query.first()
+        if not settings:
+            settings = cls()
+            db.session.add(settings)
+            db.session.commit()
+        return settings
+
+    @classmethod
+    def update_settings(cls, **kwargs):
+        settings = cls.get_settings()
+        for key, value in kwargs.items():
+            if hasattr(settings, key):
+                setattr(settings, key, value)
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        return settings
+
 class FirmSettings(db.Model):
     __tablename__ = 'firm_settings'
     
@@ -653,4 +704,20 @@ class GoogleDriveSettings(db.Model):
             'authenticated': self.authenticated,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+        
+class License(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    activation_key = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'activation_key': self.activation_key,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
         }

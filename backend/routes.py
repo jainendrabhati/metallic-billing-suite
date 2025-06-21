@@ -1,4 +1,3 @@
-
 from flask import Blueprint
 from customer_routes import customer_bp
 from bill_routes import bill_bp
@@ -7,6 +6,7 @@ from employee_routes import employee_bp
 from stock_routes import stock_bp
 from expense_routes import expense_bp
 from dashboard_routes import dashboard_bp
+from license_routes import license_bp
 
 # Create main API blueprint
 api_bp = Blueprint('api', __name__)
@@ -19,3 +19,4 @@ api_bp.register_blueprint(employee_bp)
 api_bp.register_blueprint(stock_bp)
 api_bp.register_blueprint(expense_bp)
 api_bp.register_blueprint(dashboard_bp)
+api_bp.register_blueprint(license_bp)

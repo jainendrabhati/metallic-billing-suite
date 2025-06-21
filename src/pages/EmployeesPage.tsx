@@ -190,13 +190,14 @@ const EmployeesPage = () => {
         return;
       }
       
+      
       // Create new employee
       createEmployeeMutation.mutate({
         name: employeeName,
         position: position,
-        monthly_salary: 0,
-        present_days: 0,
-        total_days: 0,
+        monthly_salary: monthlySalary,
+        present_days: presentDays,
+        total_days: presentDays,
         paid_amount: 0,
       });
     } else {

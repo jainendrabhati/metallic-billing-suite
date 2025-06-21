@@ -342,7 +342,7 @@ const StockPage = () => {
                       className="hover:bg-slate-50 border-b border-slate-100"
                     >
                       <TableCell className="font-medium text-slate-900">{item.item_name}</TableCell>
-                      <TableCell className="text-slate-700">{item.current_weight.toFixed(4)}</TableCell>
+                      <TableCell className="text-slate-700">{item.current_weight.toFixed(2)}</TableCell>
                       <TableCell className="text-slate-700">{item.description}</TableCell>
                       <TableCell className="text-slate-700">
                         {format(new Date(item.updated_at), 'dd/MM/yyyy HH:mm')}

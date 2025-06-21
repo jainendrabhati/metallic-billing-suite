@@ -1,11 +1,10 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, Clock, Users, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, Users, TrendingUp, TrendingDown, Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { customerAPI } from "@/services/api";
+import { customerAPI, settingsAPI } from "@/services/api";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -15,6 +14,11 @@ const PendingListPage = () => {
   const { data: pendingCustomers = [], isLoading } = useQuery({
     queryKey: ['customers', 'pending'],
     queryFn: customerAPI.getPendingList,
+  });
+
+  const { data: firmSettings } = useQuery({
+    queryKey: ['firmSettings'],
+    queryFn: settingsAPI.getFirmSettings,
   });
 
   const toggleCustomerExpansion = (customerId: number) => {
@@ -39,6 +43,91 @@ const PendingListPage = () => {
     enabled: expandedCustomers.size > 0,
   });
 
+  const handleDownloadPDF = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Pending List Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .logo { max-height: 60px; margin-bottom: 10px; }
+            .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .table th, .table td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 12px; }
+            .table th { background-color: #f0f0f0; font-weight: bold; }
+            .credit { color: green; font-weight: bold; }
+            .debit { color: red; font-weight: bold; }
+            .banking-info { margin: 20px 0; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            ${firmSettings?.logo_path ? `<img src="${firmSettings.logo_path}" alt="Logo" class="logo" style="display: block; margin: 0 auto;" />` : ''}
+            <h1>${firmSettings?.firm_name || 'Metalic Jewelers'}</h1>
+            <p>${firmSettings?.address || ''}</p>
+            <p>GST No: ${firmSettings?.gst_number || ''}</p>
+          </div>
+          
+          <div class="banking-info">
+            <h3>Banking Details</h3>
+            <p><strong>Account Number:</strong> ${firmSettings?.account_number || 'N/A'}</p>
+            <p><strong>Account Holder:</strong> ${firmSettings?.account_holder_name || 'N/A'}</p>
+            <p><strong>IFSC Code:</strong> ${firmSettings?.ifsc_code || 'N/A'}</p>
+            <p><strong>Branch:</strong> ${firmSettings?.branch_address || 'N/A'}</p>
+            <p><strong>City:</strong> ${firmSettings?.city || 'N/A'}</p>
+          </div>
+
+          <h2>Pending Customers List</h2>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Customer Name</th>
+                <th>Mobile</th>
+                <th>Address</th>
+                <th>Total Fine (g)</th>
+                <th>Total Amount (₹)</th>
+              
+              </tr>
+            </thead>
+            <tbody>
+              ${pendingCustomers.map((customer: any) => `
+                <tr>
+                  <td>${customer.customer_name}</td>
+                  <td>${customer.customer_mobile}</td>
+                  <td>${customer.customer_address}</td>
+                  <td>
+                        ${customer.remaining_fine >= 0
+                          ? `Remaining Credit Fine: ${customer.remaining_fine.toFixed(2)}g`
+                          : `Remaining Debit Fine: ${Math.abs(customer.remaining_fine).toFixed(2)}g`}
+                      </td>
+                      <td>
+                        ${customer.remaining_amount >= 0
+                          ? `Remaining Credit Amount: ₹${customer.remaining_amount.toLocaleString()}`
+                          : `Remaining Debit Amount: ₹${Math.abs(customer.remaining_amount).toLocaleString()}`}
+                      </td>
+                      
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div style="margin-top: 30px; text-align: center;">
+            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+      printWindow.close();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -56,6 +145,10 @@ const PendingListPage = () => {
             <p className="text-gray-600 text-sm">Customers with outstanding balances</p>
           </div>
           <div className="flex items-center gap-4">
+            <Button onClick={handleDownloadPDF} className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Download PDF
+            </Button>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">{pendingCustomers.length}</div>
               <div className="text-sm text-gray-500">Pending Customers</div>
@@ -97,14 +190,7 @@ const PendingListPage = () => {
                             </div>
                             <div className="text-xs text-gray-500">Remaining Amount</div>
                           </div>
-                          <div className="text-center">
-                            <Badge
-                              variant={customer.remaining_amount >= 0 ? 'default' : 'destructive'}
-                              className={customer.remaining_amount >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
-                            >
-                              {customer.remaining_amount >= 0 ? 'CREDIT' : 'DEBIT'}
-                            </Badge>
-                          </div>
+                          
                           <div className="flex justify-center">
                             <Button
                               variant="ghost"

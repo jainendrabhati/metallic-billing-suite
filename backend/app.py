@@ -24,9 +24,9 @@ with app.app_context():
     db.create_all()
 
     # Initialize firm settings if not exists
-    from models import FirmSettings
-    if not FirmSettings.query.first():
-        settings = FirmSettings()
+    from models import Settings
+    if not Settings.query.first():
+        settings = Settings()
         db.session.add(settings)
         db.session.commit()
 

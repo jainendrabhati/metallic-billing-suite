@@ -279,7 +279,7 @@ const ExpensesPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-100">Net Fine Balance</p>
-                  <p className="text-2xl font-bold">{dashboardData?.net_fine?.toFixed(4) || 0}g</p>
+                  <p className="text-2xl font-bold">{dashboardData?.net_fine?.toFixed(2) || 0}g</p>
                   <p className="text-xs text-green-200">Credit Fine - Debit Weight×Tunch</p>
                 </div>
                 <Scale className="h-8 w-8 text-green-200" />
@@ -303,7 +303,7 @@ const ExpensesPage = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100">Total Silver Amount</p>
+                  <p className="text-purple-100">Total Revenue</p>
                   <p className="text-2xl font-bold">₹{dashboardData?.total_silver_amount?.toLocaleString() || 0}</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-purple-200" />
@@ -311,17 +311,7 @@ const ExpensesPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100">Total Wages×Weight</p>
-                  <p className="text-2xl font-bold">₹{dashboardData?.total_wages_weight?.toLocaleString() || 0}</p>
-                </div>
-                <Scale className="h-8 w-8 text-orange-200" />
-              </div>
-            </CardContent>
-          </Card>
+          
         </div>
 
         {/* Balance Sheet */}
@@ -334,7 +324,7 @@ const ExpensesPage = () => {
               <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-lg border border-green-200">
                 <h3 className="text-lg font-semibold text-green-800 mb-2">Silver Balance</h3>
                 <p className="text-3xl font-bold text-green-600">
-                  {dashboardData?.balance_sheet?.silver_balance?.toFixed(4) || '0.0000'} grams
+                  {dashboardData?.balance_sheet?.silver_balance?.toFixed(2) || '0.0000'} grams
                 </p>
                 <p className="text-sm text-green-700 mt-2">Net silver in stock</p>
               </div>

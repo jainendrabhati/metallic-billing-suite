@@ -1,5 +1,6 @@
+
 from flask import Blueprint, request, jsonify, send_file, current_app
-from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, FirmSettings, GoogleDriveSettings
+from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, Settings, GoogleDriveSettings
 from utils import backup_database, restore_database
 from google_drive_service import google_drive_service, schedule_backup, setup_backup_scheduler
 import os
@@ -14,7 +15,7 @@ setup_backup_scheduler()
 @dashboard_bp.route('/settings', methods=['GET'])
 def get_settings():
     try:
-        settings = FirmSettings.get_settings()
+        settings = Settings.get_settings()
         return jsonify(settings.to_dict()), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -23,7 +24,7 @@ def get_settings():
 def update_settings():
     try:
         data = request.get_json()
-        settings = FirmSettings.update_settings(data)
+        settings = Settings.update_settings(**data)
         return jsonify(settings.to_dict()), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -79,13 +80,18 @@ def authenticate_google_drive():
         if not email:
             return jsonify({'error': 'Email is required'}), 400
         
-        # Authenticate with Google Drive
+        # Clear any existing authentication to force re-authentication with new email
+        token_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'gdrive_token.pickle')
+        if os.path.exists(token_path):
+            os.remove(token_path)
+        
+        # Authenticate with Google Drive using the provided email
         success = google_drive_service.authenticate(email)
         
         if not success:
             return jsonify({'error': 'Failed to authenticate with Google Drive. Please ensure you have proper credentials setup.'}), 400
         
-        # Save or update settings
+        # Save or update settings with the new email
         settings = GoogleDriveSettings.query.first()
         if not settings:
             settings = GoogleDriveSettings()
@@ -94,21 +100,22 @@ def authenticate_google_drive():
         settings.email = email
         settings.backup_time = backup_time
         settings.auto_backup_enabled = auto_backup_enabled
-        settings.authenticated = True
         
         db.session.commit()
         
         # Setup backup schedule
         if auto_backup_enabled:
-            schedule_backup(backup_time)
+            schedule_backup(settings.backup_time)
         
         return jsonify({
-            'message': 'Google Drive authenticated successfully',
+            'message': f'Google Drive authenticated successfully for {email}',
             'settings': settings.to_dict()
         }), 200
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ... keep existing code (backup APIs and dashboard API)
 
 # Backup APIs
 @dashboard_bp.route('/backup/download', methods=['GET'])
@@ -187,7 +194,7 @@ def get_dashboard_data():
         pending_customers = Customer.get_pending_customers()
         
         # Get current stock
-        current_stock = Stock.get_current_stock()
+        current_stock = Stock.get_all()
         
         # Get recent bills
         recent_bills = Bill.query.order_by(Bill.created_at.desc()).limit(5).all()
@@ -201,7 +208,7 @@ def get_dashboard_data():
         dashboard_data = {
             'recent_transactions': [t.to_dict() for t in recent_transactions],
             'pending_customers': pending_customers[:5],  # Top 5 pending
-            'current_stock': current_stock,
+            'current_stock': [s.to_dict() for s in current_stock],
             'recent_bills': [b.to_dict() for b in recent_bills],
             'totals': {
                 'customers': total_customers,

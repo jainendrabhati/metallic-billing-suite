@@ -8,10 +8,14 @@ employee_bp = Blueprint('employee', __name__)
 @employee_bp.route('/employees', methods=['POST'])
 def create_employee():
     try:
-        
         data = request.get_json()
         print(data)
-        employee = Employee.create(data['name'], data['position'])
+        employee = Employee.create(
+            name=data['name'], 
+            position=data['position'],
+        )
+        print(employee.to_dict())
+        db.session.commit()
         return jsonify(employee.to_dict()), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -72,6 +76,7 @@ def delete_employee(employee_id):
 def create_employee_salary():
     try:
         data = request.get_json()
+        print(data)
         salary = EmployeeSalary.create(
             data['employee_id'],
             data['month'],
@@ -80,22 +85,20 @@ def create_employee_salary():
             data['present_days'],
             data['total_days']
         )
+        print(salary.to_dict())
         
-        dataa =  {
-            'id': data['employee_id'],
-            'description': "Employee Salary for " + str(data['month']) + "/" + str(data['year']),
-            'amount': salary.monthly_salary,
-            'category': "Salary",
-            'status': "Pending",
-            'date': datetime.utcnow().isoformat(),
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat()
-        }
-        expense = Expense.create(**dataa)
-        if not expense:
-            return jsonify({'error': 'Failed to create expense for salary'}), 500
+        # Create expense record for salary
+        employee = Employee.get_by_id(data['employee_id'])
+        expense = Expense.create(
+            description=f"Employee Salary for {employee.name if employee else 'Unknown Employee'} - {data['month']}/{data['year']}",
+            amount=salary.calculated_salary,
+            category="Salary",
+            date=salary.created_at.date()
+        )
+        
         return jsonify(salary.to_dict()), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @employee_bp.route('/employee-salaries', methods=['GET'])
@@ -156,22 +159,24 @@ def delete_employee_salary(salary_id):
 def create_employee_payment():
     try:
         data = request.get_json()
+        
         if 'payment_date' in data and isinstance(data['payment_date'], str):
             data['payment_date'] = datetime.strptime(data['payment_date'], '%Y-%m-%d').date()
         payment = EmployeePayment.create(**data)
         
-        from models import Expense, Employee
+        # Create expense record for payment
         employee = Employee.query.get(data['employee_id'])
         expense_data = {
             'description': f"Salary payment to {employee.name if employee else 'Unknown Employee'}",
             'amount': data['amount'],
             'category': 'Salary',
-            'status': 'paid',
-            'date': data['payment_date']
+            'date': data['payment_date'] if 'payment_date' in data else datetime.utcnow().date()
         }
+        print(expense_data)
         Expense.create(**expense_data)
         return jsonify(payment.to_dict()), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @employee_bp.route('/employee-payments', methods=['GET'])
