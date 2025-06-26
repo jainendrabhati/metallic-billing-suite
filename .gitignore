@@ -24,4 +24,6 @@ dist-ssr
 *.sw?
 release/win-unpacked/Jewelry Management System.exe
 release/win-unpacked/resources/app.asar
-
+*.exe
+*.asar
+release/
