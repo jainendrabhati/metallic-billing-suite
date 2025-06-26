@@ -70,10 +70,8 @@ def export_to_pdf(data, data_type):
     styles = getSampleStyleSheet()
 
     if data_type == 'transactions':
-<<<<<<< HEAD
-=======
-        from reportlab.lib.pagesizes import A4
->>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
+
+
         # Firm Settings for Header
         firm_settings = FirmSettings.query.first()
         elements = []
@@ -392,8 +390,6 @@ def restore_database(zip_file_path):
             
     except Exception as e:
         db.session.rollback()
-<<<<<<< HEAD
+
         raise Exception(f"Database restore failed: {str(e)}")
-=======
-        raise Exception(f"Database restore failed: {str(e)}")
->>>>>>> 8adb53d60cba6671768ecbf2431d8d298215c447
+

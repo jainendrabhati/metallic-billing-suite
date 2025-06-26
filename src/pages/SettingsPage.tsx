@@ -59,6 +59,20 @@ const SettingsPage = () => {
     }
   }, [settings]);
 
+  const handleUploadBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.name.endsWith('.zip')) {
+        uploadBackupMutation.mutate(file);
+      } else {
+        toast({
+          title: "Error",
+          description: "Please upload a valid ZIP file.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
   useEffect(() => {
     if (driveSettings) {
       setGoogleDriveSettings({
@@ -83,6 +97,47 @@ const SettingsPage = () => {
       });
     },
   });
+  const downloadBackupMutation = useMutation({
+    mutationFn: settingsAPI.downloadBackup,
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Backup downloaded successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to download backup. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+  const handleDownloadBackup = () => {
+    downloadBackupMutation.mutate();
+  };
+  const uploadBackupMutation = useMutation({
+    mutationFn: settingsAPI.uploadBackup,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast({
+        title: "Success",
+        description: "Database restored successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore backup. Please try again.",
+        variant: "destructive",
+      });
+    },
+
+    
+  });
+
+  
+
 
   const handleSaveSettings = () => {
     const formData = new FormData();
@@ -249,6 +304,67 @@ const SettingsPage = () => {
                 )}
               </div>
             ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Manual Data Backup & Restore</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <h3 className="font-medium">Download Backup</h3>
+              <p className="text-sm text-gray-600">
+                Download a complete backup of your database as CSV files in ZIP format
+              </p>
+              <Button 
+                onClick={handleDownloadBackup} 
+                className="w-full flex items-center gap-2"
+                disabled={downloadBackupMutation.isPending}
+              >
+                <Download className="h-4 w-4" />
+                {downloadBackupMutation.isPending ? "Downloading..." : "Download Backup"}
+              </Button>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="space-y-2">
+                <h3 className="font-medium">Upload Backup</h3>
+                <p className="text-sm text-gray-600">
+                  Restore data from a previously downloaded backup ZIP file
+                </p>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                  <Upload className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-2">
+                    Choose backup ZIP file to upload
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => document.getElementById('backup-upload')?.click()}
+                    disabled={uploadBackupMutation.isPending}
+                  >
+                    {uploadBackupMutation.isPending ? "Uploading..." : "Select File"}
+                  </Button>
+                  <input
+                    id="backup-upload"
+                    type="file"
+                    accept=".zip"
+                    onChange={handleUploadBackup}
+                    className="hidden"
+                  />` `
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-800 mb-1">⚠️ Important Note</h4>
+                <p className="text-sm text-yellow-700">
+                  Uploading a backup will replace all existing data. Make sure to download 
+                  a current backup before proceeding.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

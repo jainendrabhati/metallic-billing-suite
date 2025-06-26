@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -18,6 +17,11 @@ export default defineConfig({
   build: {
     outDir: "dist",
     assetsDir: "assets",
+    // Fix for Electron
+    target: "esnext",
+    rollupOptions: {
+      external: [],
+    },
   },
-
+  base: "./", // Important for Electron file:// protocol
 });

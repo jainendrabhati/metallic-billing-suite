@@ -7,24 +7,26 @@
   },
   "files": [
     "dist/**/*",
-    "backend/**/*",
+    "backend/dist/run.exe",
     "electron-main.cjs",
     "package.json"
   ],
   "extraResources": [
-    {
-      "from": "backend",
-      "to": "backend"
-    }
-  ],
-  "main": "electron-main.cjs",
+  {
+    "from": "backend/dist/run.exe",
+    "to": "backend/run.exe"
+  }
+],
+
   "win": {
     "target": "nsis",
     "signtoolOptions": {
-      "publisherName": "Your Company Name"
-    },
-    "sign": false
+      "publisherName": "Metalic"
+    }
+   
   },
+  
+
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,

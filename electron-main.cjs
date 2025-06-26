@@ -1,7 +1,8 @@
-
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
+const isDev = require('electron-is-dev');
 
 let flaskProcess = null;
 let mainWindow = null;
@@ -13,62 +14,77 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: !isDev,
     },
-    show: false
+    show: false,
+    icon: path.join(__dirname, 'assets/icon.png'),
   });
 
-  // Hide menu bar for production look
   Menu.setApplicationMenu(null);
 
-  // Load the React app (served by Flask)
-  mainWindow.loadURL('http://localhost:5000');
-  
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:8080');
+    mainWindow.webContents.openDevTools();
+  } else {
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    if (!fs.existsSync(indexPath)) {
+      console.error('index.html not found:', indexPath);
+    }
+    mainWindow.loadFile(indexPath);
+  }
+
+  mainWindow.once('ready-to-show', () => mainWindow.show());
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('Failed to load:', validatedURL, errorDescription);
+  });
 }
 
 function startFlask() {
-  // Start Flask server
-  const flaskScript = path.join(__dirname, 'backend', 'run.py');
-  flaskProcess = spawn('python', [flaskScript], {
-    cwd: path.join(__dirname, 'backend'),
-    stdio: 'inherit'
+  const flaskExePath = isDev
+    ? path.join(__dirname, 'backend', 'dist', 'run.exe')  // PyInstaller EXE in dev
+    : path.join(process.resourcesPath, 'backend', 'run.exe');  // Embedded in prod
+
+  console.log('Starting backend:', flaskExePath);
+
+  flaskProcess = spawn(flaskExePath, [], {
+    cwd: path.dirname(flaskExePath),
+    stdio: isDev ? 'inherit' : 'ignore'
   });
-  
+
   flaskProcess.on('error', (err) => {
     console.error('Failed to start Flask:', err);
+  });
+
+  flaskProcess.on('close', (code) => {
+    console.log(`Flask process exited with code ${code}`);
   });
 }
 
 app.whenReady().then(() => {
-  startFlask();
-  
-  // Wait for Flask to start, then create window
+  createWindow();
+
+  // Start Flask backend first
   setTimeout(() => {
-    createWindow();
-  }, 3000);
+    startFlask();
+  }, 1000);
 });
 
 app.on('window-all-closed', () => {
-  if (flaskProcess) {
-    flaskProcess.kill();
-  }
-  app.quit();
+  if (flaskProcess) flaskProcess.kill();
+  if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  if (flaskProcess) flaskProcess.kill();
 });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
-  });
-});
-
-app.on('before-quit', () => {
-  if (flaskProcess) {
-    flaskProcess.kill();
   }
 });

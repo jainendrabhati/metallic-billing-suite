@@ -36,7 +36,7 @@ const PendingListPage = () => {
 
   };
 
-  const { data: customerBills = {} } = useQuery({
+  const { data: getCustomerBillscustomerBills = {} } = useQuery({
     queryKey: ['customer-bills', Array.from(expandedCustomers)],
     queryFn: async () => {
       const billsData: { [key: number]: any[] } = {};
