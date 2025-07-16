@@ -721,3 +721,124 @@ class License(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
+
+class GSTBill(db.Model):
+    __tablename__ = 'gst_bills'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    bill_number = db.Column(db.String(50), unique=True, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    customer_name = db.Column(db.String(200), nullable=False)
+    customer_address = db.Column(db.Text, nullable=False)
+    customer_gstin = db.Column(db.String(15), nullable=True)
+    total_amount_before_tax = db.Column(db.Float, nullable=False, default=0.0)
+    cgst_percentage = db.Column(db.Float, nullable=False, default=0.0)
+    sgst_percentage = db.Column(db.Float, nullable=False, default=0.0)
+    igst_percentage = db.Column(db.Float, nullable=False, default=0.0)
+    cgst_amount = db.Column(db.Float, nullable=False, default=0.0)
+    sgst_amount = db.Column(db.Float, nullable=False, default=0.0)
+    igst_amount = db.Column(db.Float, nullable=False, default=0.0)
+    grand_total = db.Column(db.Float, nullable=False, default=0.0)
+    amount_in_words = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    items = db.relationship('GSTBillItem', backref='gst_bill', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'bill_number': self.bill_number,
+            'date': self.date.isoformat() if self.date else None,
+            'customer_name': self.customer_name,
+            'customer_address': self.customer_address,
+            'customer_gstin': self.customer_gstin,
+            'items': [item.to_dict() for item in self.items],
+            'total_amount_before_tax': self.total_amount_before_tax,
+            'cgst_percentage': self.cgst_percentage,
+            'sgst_percentage': self.sgst_percentage,
+            'igst_percentage': self.igst_percentage,
+            'cgst_amount': self.cgst_amount,
+            'sgst_amount': self.sgst_amount,
+            'igst_amount': self.igst_amount,
+            'grand_total': self.grand_total,
+            'amount_in_words': self.amount_in_words,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def generate_bill_number(cls):
+        today = datetime.now().date()
+        date_str = today.strftime('%Y%m%d')
+        last_bill = cls.query.filter(cls.bill_number.like(f'GST{date_str}%')).order_by(cls.bill_number.desc()).first()
+        
+        if last_bill:
+            last_number = int(last_bill.bill_number[-4:])
+            new_number = last_number + 1
+        else:
+            new_number = 1
+        
+        return f"GST{date_str}{new_number:04d}"
+
+    @classmethod
+    def create(cls, **kwargs):
+        kwargs['bill_number'] = cls.generate_bill_number()
+        bill = cls(**kwargs)
+        db.session.add(bill)
+        db.session.flush()  # Get the bill ID
+        return bill
+
+    @classmethod
+    def get_all(cls):
+        return cls.query.order_by(cls.created_at.desc()).all()
+
+    @classmethod
+    def get_by_id(cls, bill_id):
+        return cls.query.get(bill_id)
+
+    @classmethod
+    def get_filtered(cls, start_date=None, end_date=None, customer_name=None):
+        query = cls.query
+        
+        if start_date:
+            query = query.filter(cls.date >= start_date)
+        
+        if end_date:
+            query = query.filter(cls.date <= end_date)
+        
+        if customer_name:
+            query = query.filter(cls.customer_name.contains(customer_name))
+        
+        return query.order_by(cls.created_at.desc()).all()
+
+class GSTBillItem(db.Model):
+    __tablename__ = 'gst_bill_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    gst_bill_id = db.Column(db.Integer, db.ForeignKey('gst_bills.id'), nullable=False)
+    description = db.Column(db.String(200), nullable=False)
+    hsn = db.Column(db.String(20), nullable=False)
+    weight = db.Column(db.Float, nullable=False)
+    rate = db.Column(db.Float, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'gst_bill_id': self.gst_bill_id,
+            'description': self.description,
+            'hsn': self.hsn,
+            'weight': self.weight,
+            'rate': self.rate,
+            'amount': self.amount,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+    @classmethod
+    def create(cls, **kwargs):
+        item = cls(**kwargs)
+        db.session.add(item)
+        return item

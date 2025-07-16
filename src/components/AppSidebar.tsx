@@ -9,6 +9,8 @@ import {
   UserCheck,
   Users,
   Clock,
+  FileText,
+  FileSpreadsheet
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useSidebar } from "@/components/SidebarProvider";
@@ -44,6 +46,16 @@ const items = [
     title: "Stock Management",
     url: "/stock",
     icon: Package,
+  },
+  {
+    title: "GST Bill",
+    url: "/gst-bill",
+    icon: FileText,
+  },
+  {
+    title: "GST Bill Logs",
+    url: "/gst-bill-logs",
+    icon: FileSpreadsheet,
   },
   {
     title: "Employees",
@@ -86,7 +98,7 @@ const AppSidebar = () => {
 
   return (
     <aside
-      className={`bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ${
+      className={`bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 fixed left-0 top-0 h-full z-10 ${
         isOpen ? "w-64" : "w-16"
       }`}
     >

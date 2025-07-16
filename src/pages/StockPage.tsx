@@ -12,9 +12,13 @@ import { Package, Plus, TrendingUp, TrendingDown, Edit, Trash2 } from "lucide-re
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stockAPI, stockItemAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import AppSidebar from "@/components/AppSidebar";
+import { useSidebar } from "@/components/SidebarProvider";
+import Navbar from "@/components/Navbar";
 import { format } from "date-fns";
 
 const StockPage = () => {
+  const { isOpen } = useSidebar();
   const [itemName, setItemName] = useState("");
   const [currentWeight, setCurrentWeight] = useState("");
   const [description, setDescription] = useState("");
@@ -175,6 +179,10 @@ const StockPage = () => {
   };
 
   return (
+     <>
+    <AppSidebar />
+          <div className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-16"}`}>
+            <Navbar />
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
@@ -498,6 +506,8 @@ const StockPage = () => {
         </Card>
       </div>
     </div>
+          </div>
+    </>
   );
 };
 

@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, StockItem, Stock, FirmSettings, EmployeeSalary
+from app import app
 
 def export_to_csv(data, data_type):
     """Export data to CSV format"""
@@ -197,78 +198,77 @@ def export_to_pdf(data, data_type):
     
     return filename
 
+
+
 def backup_database():
     """Create a backup of the entire database as CSV files in a ZIP"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    zip_filename = f"metalic_backup_{timestamp}.zip"
-    zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
-    
-    print(f"Creating backup ZIP at: {zip_filepath}")
-    
-    # Create a temporary directory for CSV files
-    with tempfile.TemporaryDirectory() as temp_dir:
-        print(f"Using temp directory: {temp_dir}")
-        
-        # Export each model to CSV
-        models_data = {
-            'customers': Customer.query.all(),
-            'bills': Bill.query.all(),
-            'transactions': Transaction.query.all(),
-            'expenses': Expense.query.all(),
-            'employees': Employee.query.all(),
-            'employee_salaries': EmployeeSalary.query.all(),
-            'employee_payments': EmployeePayment.query.all(),
-            'stock_items': StockItem.query.all(),
-            'stock': Stock.query.all(),
-            'firm_settings': FirmSettings.query.all()
-        }
-        
-        csv_files = []
-        
-        for model_name, data in models_data.items():
-            csv_filename = f"{model_name}.csv"
-            csv_filepath = os.path.join(temp_dir, csv_filename)
-            csv_files.append((csv_filepath, csv_filename))
-            
-            print(f"Creating CSV for {model_name} with {len(data)} records")
-            
-            # Write CSV with proper headers (only actual database columns)
-            with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
-                if data:
-                    # Get only the database column fields
+    with app.app_context():  # Ensure Flask app context is active during scheduled tasks
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_filename = f"metalic_backup_{timestamp}.zip"
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', 'backups')
+        os.makedirs(upload_folder, exist_ok=True)
+        zip_filepath = os.path.join(upload_folder, zip_filename)
+
+        print(f"Creating backup ZIP at: {zip_filepath}")
+
+        # Create a temporary directory for CSV files
+        with tempfile.TemporaryDirectory() as temp_dir:
+            print(f"Using temp directory: {temp_dir}")
+
+            # Export each model to CSV
+            models_data = {
+                'customers': Customer.query.all(),
+                'bills': Bill.query.all(),
+                'transactions': Transaction.query.all(),
+                'expenses': Expense.query.all(),
+                'employees': Employee.query.all(),
+                'employee_salaries': EmployeeSalary.query.all(),
+                'employee_payments': EmployeePayment.query.all(),
+                'stock_items': StockItem.query.all(),
+                'stock': Stock.query.all(),
+                'firm_settings': FirmSettings.query.all()
+            }
+
+            csv_files = []
+
+            for model_name, data in models_data.items():
+                csv_filename = f"{model_name}.csv"
+                csv_filepath = os.path.join(temp_dir, csv_filename)
+                csv_files.append((csv_filepath, csv_filename))
+
+                print(f"Creating CSV for {model_name} with {len(data)} records")
+
+                with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
                     fieldnames = get_model_database_fields(model_name)
-                    
+
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
-                    
+
                     for item in data:
-                        item_dict = item.to_dict()
-                        # Filter to only include database fields
-                        filtered_dict = {key: value for key, value in item_dict.items() if key in fieldnames}
-                        
-                        # Convert None values to empty strings and handle dates
+                        item_dict = item.to_dict()  # Ensure your models have a correct to_dict()
+                        filtered_dict = {key: item_dict.get(key, '') for key in fieldnames}
+
+                        # Convert None and datetime
                         for key, value in filtered_dict.items():
                             if value is None:
                                 filtered_dict[key] = ''
-                            elif hasattr(value, 'isoformat'):  # Handle datetime/date objects
+                            elif hasattr(value, 'isoformat'):
                                 filtered_dict[key] = value.isoformat()
+
                         writer.writerow(filtered_dict)
-                else:
-                    # Create empty CSV with headers
-                    headers = get_model_database_fields(model_name)
-                    writer = csv.writer(csvfile)
-                    writer.writerow(headers)
-        
-        # Create ZIP file
-        print(f"Creating ZIP file with {len(csv_files)} CSV files")
-        with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for csv_filepath, csv_filename in csv_files:
-                if os.path.exists(csv_filepath):
-                    zipf.write(csv_filepath, csv_filename)
-                    print(f"Added {csv_filename} to ZIP")
-    
-    print(f"Backup created successfully: {zip_filename}")
-    return zip_filename
+
+            print(f"Creating ZIP file with {len(csv_files)} CSV files")
+
+            with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for csv_filepath, csv_filename in csv_files:
+                    if os.path.exists(csv_filepath):
+                        zipf.write(csv_filepath, csv_filename)
+                        print(f"Added {csv_filename} to ZIP")
+
+        print(f"Backup created successfully: {zip_filename}")
+        return zip_filename
+
 
 def get_model_database_fields(model_name):
     """Get only the actual database fields for each model (not computed fields from to_dict)"""

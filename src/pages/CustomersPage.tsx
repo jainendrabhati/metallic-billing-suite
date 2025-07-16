@@ -10,8 +10,18 @@ import { Search, UserPlus, Phone, MapPin, Users, Eye, FileText, Download, Calend
 import { useQuery } from "@tanstack/react-query";
 import { customerAPI, billAPI } from "@/services/api";
 import { format } from "date-fns";
+import AppSidebar from "@/components/AppSidebar";
+import Navbar from "@/components/Navbar";
+import { useSidebar } from "@/components/SidebarProvider";
+
+
+  
+
+
+  
 
 const CustomersPage = () => {
+  const { isOpen } = useSidebar();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [fromDate, setFromDate] = useState("");
@@ -312,6 +322,10 @@ const CustomersPage = () => {
   }
 
   return (
+     <>
+    <AppSidebar />
+          <div className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-16"}`}>
+            <Navbar />
     <div className="h-screen overflow-hidden bg-gray-50 flex flex-col">
       <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
@@ -544,6 +558,8 @@ const CustomersPage = () => {
         )}
       </div>
     </div>
+    </div>
+     </>  
   );
 };
 

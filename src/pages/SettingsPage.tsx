@@ -10,6 +10,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import GoogleDriveSettings from "@/components/GoogleDriveSettings";
+import AppSidebar from "@/components/AppSidebar";
+import { useSidebar } from "@/components/SidebarProvider";
+import Navbar from "@/components/Navbar";
 
 const SettingsPage = () => {
   const [firmSettings, setFirmSettings] = useState({
@@ -32,6 +35,7 @@ const SettingsPage = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isOpen } = useSidebar();
 
   const { data: settings } = useQuery({
     queryKey: ["firmSettings"],
@@ -165,6 +169,10 @@ const SettingsPage = () => {
   };
 
   return (
+     <>
+    <AppSidebar />
+          <div className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-16"}`}>
+            <Navbar />
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
@@ -369,6 +377,9 @@ const SettingsPage = () => {
         </Card>
       </div>
     </div>
+    </div>
+          
+    </>
   );
 };
 

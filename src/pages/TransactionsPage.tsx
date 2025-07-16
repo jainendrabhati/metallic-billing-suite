@@ -9,11 +9,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar, Download, FileText, Eye, Printer, Edit, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { transactionAPI, billAPI } from "@/services/api";
+import { transactionAPI, billAPI, customerAPI } from "@/services/api";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import AppSidebar from "@/components/AppSidebar";
+import { useSidebar } from "@/components/SidebarProvider";
+import Navbar from "@/components/Navbar";
+
+interface Transaction {
+  id: number;
+  customer_id: number;
+  customer_name?: string;
+  date: string;
+  type: "income" | "expense";
+  amount: number;
+  description: string;
+}
+
 
 const TransactionsPage = () => {
+  const { isOpen } = useSidebar();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -54,7 +69,7 @@ const TransactionsPage = () => {
         const silverAmount = data.updates.silver_amount || editTransaction.silver_amount;
         const paymentType = data.updates.payment_type || editTransaction.payment_type;
         
-        const totalFine = weight * ((tunch - wastage) / 100);
+        const totalFine = weight * ((tunch + wastage) / 100);
         const totalAmount = (weight * (wages / 1000)) + (paymentType === 'credit' ? silverAmount : 0);
         
         const billUpdates = {
@@ -219,7 +234,7 @@ const TransactionsPage = () => {
     const wages = parseFloat(editTransaction.wages) || 0;
     const silverAmount = parseFloat(editTransaction.silver_amount) || 0;
     
-    const totalFine = weight * ((tunch - wastage) / 100);
+    const totalFine = weight * ((tunch + wastage) / 100);
     const totalAmount = (weight * (wages / 1000)) + (editTransaction.payment_type === 'credit' ? silverAmount : 0);
     
     return { totalFine, totalAmount };
@@ -240,7 +255,7 @@ const TransactionsPage = () => {
         ${transaction.tunch ? `<p><strong>Tunch:</strong> ${transaction.tunch}%</p>` : ''}
         ${transaction.wages ? `<p><strong>Wages:</strong> ₹${transaction.wages}</p>` : ''}
         ${transaction.wastage ? `<p><strong>Wastage:</strong> ${transaction.wastage}%</p>` : ''}
-        ${transaction.total_wages ? `<p><strong>Total Wages:</strong> ₹${transaction.total_wages}</p>` : ''}
+        ${transaction.total_wages ? `<p><strong>Total Wages:</strong> ₹${transaction.total_wages/1000}</p>` : ''}
         ${transaction.silver_amount ? `<p><strong>Silver Amount:</strong> ₹${transaction.silver_amount}</p>` : ''}
         ${transaction.item_name ? `<p><strong>Item Name:</strong> ${transaction.item_name}</p>` : ''}
         ${transaction.item ? `<p><strong>Item Type:</strong> ${transaction.item}</p>` : ''}
@@ -256,6 +271,10 @@ const TransactionsPage = () => {
   };
 
   return (
+     <>
+    <AppSidebar />
+          <div className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-16"}`}>
+            <Navbar />
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Transactions</h1>
@@ -346,7 +365,7 @@ const TransactionsPage = () => {
                     <TableCell>₹{transaction.amount.toFixed(2)}</TableCell>
                     <TableCell>
                       {transaction.weight && transaction.tunch && transaction.wastage 
-                        ? `${(transaction.weight * ((transaction.tunch - transaction.wastage) / 100)).toFixed(2)}g`
+                        ? `${(transaction.weight * ((transaction.tunch + transaction.wastage) / 100)).toFixed(2)}g`
                         : 'N/A'
                       }
                     </TableCell>
@@ -590,7 +609,7 @@ const TransactionsPage = () => {
                 {selectedTransaction.total_wages && (
                   <div>
                     <label className="font-medium">Total Wages:</label>
-                    <p>₹{selectedTransaction.total_wages}</p>
+                    <p>₹{selectedTransaction.total_wages/1000}</p>
                   </div>
                 )}
                 {selectedTransaction.silver_amount && (
@@ -622,6 +641,9 @@ const TransactionsPage = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </div>
+          
+     </>
   );
 };
 

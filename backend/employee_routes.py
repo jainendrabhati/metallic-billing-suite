@@ -88,12 +88,12 @@ def create_employee_salary():
         
         # Create expense record for salary
         employee = Employee.get_by_id(data['employee_id'])
-        expense = Expense.create(
-            description=f"Employee Salary for {employee.name if employee else 'Unknown Employee'} - {data['month']}/{data['year']}",
-            amount=salary.calculated_salary,
-            category="Salary",
-            date=salary.created_at.date()
-        )
+        # expense = Expense.create(
+        #     description=f"Employee Salary for {employee.name if employee else 'Unknown Employee'} - {data['month']}/{data['year']}",
+        #     amount=salary.calculated_salary,
+        #     category="Salary",
+        #     date=salary.created_at.date()
+        # )
         
         return jsonify(salary.to_dict()), 201
     except Exception as e:

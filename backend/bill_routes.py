@@ -33,6 +33,7 @@ def create_bill():
             data['date'] = datetime.strptime(data['date'], '%Y-%m-%d').date()
         
         # Calculate totals
+        print(data)
         weight = float(data['weight'])
         tunch = float(data['tunch'])
         wastage = float(data['wastage'])

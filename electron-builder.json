@@ -1,38 +1,68 @@
-
 {
   "appId": "com.yourcompany.jewelryapp",
   "productName": "Jewelry Management System",
   "directories": {
-    "output": "release"
+    "output": "release",
+    "buildResources": "assets"
   },
   "files": [
     "dist/**/*",
-    "backend/dist/run.exe",
+    "backend/**/*",
     "electron-main.cjs",
-    "package.json"
+    "package.json",
+    "!backend/envs{,/**}",
+    "!backend/__pycache__{,/**}",
+    "!**/*.pyc"
   ],
   "extraResources": [
-  {
-    "from": "backend/dist/run.exe",
-    "to": "backend/run.exe"
-  }
-],
-
-  "win": {
-    "target": "nsis",
-    "signtoolOptions": {
-      "publisherName": "Metalic"
+    {
+      "from": "backend",
+      "to": "backend",
+      "filter": [
+        "!**/__pycache__{,/**}",
+        "!**/*.pyc",
+        "!envs{,/**}"
+      ]
     }
-   
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icon.ico",
+    "requestedExecutionLevel": "requireAdministrator"
+    
   },
-  
-
+  "mac": {
+    "target": "dmg",
+    "icon": "assets/icon.icns",
+    "category": "public.app-category.business"
+  },
+  "linux": {
+    "target": "AppImage",
+    "icon": "assets/icon.png",
+    "category": "Office"
+  },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
-    "createStartMenuShortcut": true
+    "createStartMenuShortcut": true,
+    "shortcutName": "Jewelry Management System",
+    "runAfterFinish": true,
+    "allowElevation": true,
+    "installerHeaderIcon": "assets/icon.ico",
+    "uninstallerIcon": "assets/icon.ico",
+    "installerIcon": "assets/icon.ico",
+    "perMachine": true
   },
   "nodeGypRebuild": false,
-  "buildDependenciesFromSource": false
+  "buildDependenciesFromSource": false,
+  "publish": {
+    "provider": "generic",
+    "url": "https://your-update-server.com"
+  }
 }

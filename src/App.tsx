@@ -8,27 +8,42 @@ import ExpensesPage from "@/pages/ExpensesPage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/NotFound";
 import AppSidebar from "@/components/AppSidebar";
+import GSTBillPage from "./pages/GSTBillPage";
+import GSTBillLogsPage from "./pages/GSTBillLogsPage";
 import Navbar from "@/components/Navbar";
 import { SidebarProvider } from "@/components/SidebarProvider";
 import LicenseAuthDialog from "@/components/LicenseAuthDialog";
+
 import {
-  BrowserRouter as Router,
+  BrowserRouter,
+  HashRouter,
   Routes,
   Route,
 } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster"
+
+import { Toaster } from "@/components/ui/toaster";
 import {
   QueryClient,
   QueryClientProvider,
-} from '@tanstack/react-query'
-import { useLicenseAuth } from "@/hooks/useLicenseAuth";
+} from '@tanstack/react-query';
 
-const queryClient = new QueryClient()
+import { useLicenseAuth } from "@/hooks/useLicenseAuth";
 import PendingListPage from "@/pages/PendingListPage";
 import StockPage from "@/pages/StockPage";
 
+const queryClient = new QueryClient();
+
+// Use HashRouter in production (Electron), BrowserRouter in development
+const Router =
+  process.env.NODE_ENV === "production" ? HashRouter : BrowserRouter;
+
 function AppContent() {
-  const { isAuthenticated, isLoading, showAuthDialog, handleAuthSuccess } = useLicenseAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    showAuthDialog,
+    handleAuthSuccess,
+  } = useLicenseAuth();
 
   if (isLoading) {
     return (
@@ -50,8 +65,8 @@ function AppContent() {
             <p className="text-gray-600">Please authenticate your license to continue.</p>
           </div>
         </div>
-        <LicenseAuthDialog 
-          open={showAuthDialog} 
+        <LicenseAuthDialog
+          open={showAuthDialog}
           onAuthSuccess={handleAuthSuccess}
         />
       </>
@@ -68,9 +83,13 @@ function AppContent() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/billing" element={<BillingPage />} />
+              <Route path="/transactions" element={<TransactionsPage />} />
+              <Route path="/gst-bill" element={<GSTBillPage />} />
+              
+              <Route path="/gst-bill-logs" element={<GSTBillLogsPage />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/pending-list" element={<PendingListPage />} />
-              <Route path="/transactions" element={<TransactionsPage />} />
+              
               <Route path="/employees" element={<EmployeesPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/settings" element={<SettingsPage />} />

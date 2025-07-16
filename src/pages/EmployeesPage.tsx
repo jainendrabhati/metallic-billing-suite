@@ -13,6 +13,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { employeeAPI, employeePaymentAPI, employeeSalaryAPI, Employee, EmployeePayment, EmployeeSalary } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import AppSidebar from "@/components/AppSidebar";
+import { useSidebar } from "@/components/SidebarProvider";
+import Navbar from "@/components/Navbar";
+
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -40,6 +44,7 @@ const EmployeesPage = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isOpen } = useSidebar();
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
@@ -255,6 +260,10 @@ const EmployeesPage = () => {
   };
 
   return (
+     <>
+    <AppSidebar />
+          <div className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-16"}`}>
+            <Navbar />
     <div className="space-y-6 bg-gray-50 min-h-screen p-6">
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <div className="flex items-center justify-between mb-6">
@@ -632,6 +641,8 @@ const EmployeesPage = () => {
         </DialogContent>
       </Dialog>
     </div>
+          </div>
+     </>
   );
 };
 

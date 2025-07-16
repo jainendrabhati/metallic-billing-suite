@@ -16,8 +16,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customerAPI, billAPI, stockItemAPI, settingsAPI, Customer, Bill } from "@/services/api";
 import BillPrint from "@/components/BillPrint";
+import AppSidebar from "@/components/AppSidebar";
+import Navbar from "@/components/Navbar";
+import { useSidebar } from "@/components/SidebarProvider";
+
+
+  
 
 const BillingPage = () => {
+  const { isOpen } = useSidebar();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -152,7 +159,18 @@ const BillingPage = () => {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    console.log("Submitting bill with data:", {
+      customerName,
+      mobile,
+      address,
+      itemName,
+      item,
+      weight,
+      tunch,
+      wages,
+      wastage,
+      date,
+    });
     if (!customerName || !mobile || !address || !itemName || !item || !weight || !tunch || !wages || !wastage || !date) {
       toast({
         title: "Error",
@@ -203,6 +221,10 @@ const BillingPage = () => {
   };
 
   return (
+    <>
+    <AppSidebar />
+          <div className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-16"}`}>
+            <Navbar />
     <div className="h-screen overflow-hidden bg-gray-50 flex flex-col">
       <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -302,7 +324,7 @@ const BillingPage = () => {
                           <SelectContent>
                             {stockItems.map((stockItem) => (
                               <SelectItem key={stockItem.id} value={stockItem.item_name}>
-                                {stockItem.item_name} ({stockItem.current_weight.toFixed(4)}g)
+                                {stockItem.item_name} ({stockItem.current_weight.toFixed(2)}g)
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -547,6 +569,8 @@ const BillingPage = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </div>
+    </>
   );
 };
 

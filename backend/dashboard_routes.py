@@ -229,3 +229,7 @@ def get_dashboard_data():
         return jsonify(dashboard_data), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@dashboard_bp.route('/health', methods=['GET'])
+def health_check():
+    return 'OK', 200

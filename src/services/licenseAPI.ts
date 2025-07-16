@@ -78,11 +78,11 @@ export const licenseAPI = {
         await licenseAPI.saveLicense(licenseData);
         return { success: true };
       } else {
-        throw new Error("Authentication failed");
+        throw new Error("Authentication failed"); 
       }
     } catch (error: any) {
       if (error.name === 'AbortError' || error.message.includes('fetch')) {
-        throw new Error("Could not connect to license server");
+        throw new Error("Could not connect to license server" );
       }
       throw error;
     }

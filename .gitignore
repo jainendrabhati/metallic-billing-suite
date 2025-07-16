@@ -27,3 +27,7 @@ release/win-unpacked/resources/app.asar
 *.exe
 *.asar
 release/
+backend/__pycache__/
+backend/envs/
+backend/envs/*
+release
