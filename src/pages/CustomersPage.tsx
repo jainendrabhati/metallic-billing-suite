@@ -26,6 +26,9 @@ const CustomersPage = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [pdfHtmlContent, setPdfHtmlContent] = useState<string | null>(null);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+
   
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
@@ -512,7 +515,9 @@ const CustomersPage = () => {
                                           <TableHead>Wastage (%)</TableHead>
                                           <TableHead>Wages</TableHead>
                                           <TableHead>Total Fine (g)</TableHead>
+                                          <TableHead>Description</TableHead>
                                           <TableHead>Total Amount</TableHead>
+                                          
                                           
                                           <TableHead>Type</TableHead>
                                         </TableRow>
@@ -528,6 +533,7 @@ const CustomersPage = () => {
                                             <TableCell>{bill.wastage.toFixed(2)}</TableCell>
                                             <TableCell>₹{bill.wages.toFixed(2)}</TableCell>
                                             <TableCell>{(bill.weight * ((bill.tunch + bill.wastage) / 100)).toFixed(2)}</TableCell>
+                                            <TableCell>₹{bill.description || 'N/A'}</TableCell>
                                             <TableCell className="font-semibold text-green-600">₹{bill.total_amount.toFixed(2)}</TableCell>
                                             
                                             <TableCell>
