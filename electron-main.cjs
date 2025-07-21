@@ -356,30 +356,33 @@ async function waitForFlask(url = "http://127.0.0.1:5000/health", timeout = 1500
 }
 
 app.whenReady().then(async () => {
-  createWindow(); // Create hidden window
+  createWindow(); // Create the window (hidden initially)
 
+  // Load frontend immediately, regardless of backend state
+  if (isDev) {
+    mainWindow.loadURL("http://localhost:8080");
+    mainWindow.webContents.openDevTools();
+  } else {
+    const indexPath = path.join(__dirname, "dist", "index.html");
+    console.log("Loading index.html from:", indexPath);
+    mainWindow.loadFile(indexPath);
+  }
+
+  // Show window as soon as the frontend is loaded
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+  });
+
+  // Start backend in the background
   try {
-    await setupPythonEnvironment(); // This starts Flask
-    await waitForFlask();           // Wait until Flask is actually running
-
-    if (isDev) {
-      mainWindow.loadURL('http://localhost:8080');
-      mainWindow.webContents.openDevTools();
-    } else {
-      const indexPath = path.join(__dirname, 'dist', 'index.html');
-      console.log('Loading index.html from:', indexPath);
-      mainWindow.loadFile(indexPath);
-    }
-
-    mainWindow.once('ready-to-show', () => {
-      mainWindow.show();
-    });
-
+    await setupPythonEnvironment(); // Start Flask
+    // await waitForFlask();        // Optional: wait if needed
+    console.log("Backend started successfully.");
   } catch (err) {
     console.error("Backend failed to start:", err.message);
-    dialog.showErrorBox("Error", "Failed to start backend: " + err.message);
-    app.quit();
+    dialog.showErrorBox("Backend Error", "Flask server could not start.\n\nYou can still use the UI, but some features may not work.\n\nError: " + err.message);
   }
 });
+
 
 

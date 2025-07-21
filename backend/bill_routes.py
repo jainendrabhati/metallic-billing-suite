@@ -55,7 +55,7 @@ def create_bill():
             customer_id=bill.customer_id,
             amount=bill.total_amount,
             transaction_type=bill.payment_type,
-            description=f"Bill #{bill.bill_number} - {bill.item_name}"
+            description=data['description']
         )
         
         # Update stock

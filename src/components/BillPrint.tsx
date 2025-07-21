@@ -96,7 +96,7 @@ const BillPrint: React.FC<BillPrintProps> = ({ bill, firmSettings }) => {
                 <td>{bill.tunch.toFixed(2)}</td>
                 <td>{bill.wastage.toFixed(2)}</td>
                 <td>{bill.wages.toFixed(2)}</td>
-                <td>{bill.total_fine.toFixed(2)}</td>
+                 <td>{bill.total_fine.toFixed(2)}</td>
                 {bill.payment_type === 'credit' && <td>₹{bill.silver_amount.toFixed(2)}</td>}
                 <td>₹{bill.total_amount.toFixed(2)}</td>
               </tr>

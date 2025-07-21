@@ -486,8 +486,8 @@ const EmployeesPage = () => {
                     <TableRow key={employee.id} className="hover:bg-gray-50 border-b border-gray-100">
                       <TableCell className="text-gray-700">{employee.name}</TableCell>
                       <TableCell className="text-gray-700">{employee.position}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.total_calculated_salary || 0}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.total_paid_amount || 0}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.total_calculated_salary.toFixed(2) || 0}</TableCell>
+                      <TableCell className="text-gray-700">₹{employee.total_paid_amount.toFixed(2) || 0}</TableCell>
                       <TableCell className="text-gray-700">
                         <Badge variant={(employee.remaining_amount || 0) > 0 ? "destructive" : "default"}>
                           ₹{employee.remaining_amount || 0}

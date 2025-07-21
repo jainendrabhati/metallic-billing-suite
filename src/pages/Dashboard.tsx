@@ -31,12 +31,12 @@ const Dashboard = () => {
 
   const { data: expenses = [] } = useQuery({
     queryKey: ['expenses'],
-    queryFn: expenseAPI.getAll,
+    queryFn: () => expenseAPI.getAll(),
   });
 
   // Calculate statistics
   const totalRevenue = bills.reduce((sum, bill) => sum + bill.total_amount, 0);
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const totalExpenses = 0
   const netProfit = totalRevenue - totalExpenses;
   const growthPercentage = bills.length > 0 ? ((bills.length / Math.max(bills.length - 10, 1)) * 100) - 100 : 0;
 

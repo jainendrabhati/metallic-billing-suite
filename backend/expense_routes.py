@@ -1,26 +1,112 @@
 
 from flask import Blueprint, request, jsonify
-from models import db, Expense, Bill
+from models import db, Expense, Bill, Stock
 from datetime import datetime
+from sqlalchemy import and_
 
 expense_bp = Blueprint('expense', __name__)
+
+@expense_bp.route('/expenses', methods=['GET'])
+def get_expenses():
+    try:
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        
+        # Build query for expenses
+        query = Expense.query
+        
+        # Apply date filters
+        if from_date:
+            query = query.filter(Expense.date >= from_date)
+        if to_date:
+            query = query.filter(Expense.date <= to_date)
+            
+        expenses = query.order_by(Expense.created_at.desc()).all()
+        
+        # Get dashboard data with same date filters
+        dashboard_data = get_dashboard_data(from_date, to_date)
+        
+        return jsonify({
+            'expenses': [expense.to_dict() for expense in expenses],
+            'dashboard': dashboard_data
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def get_dashboard_data(from_date=None, to_date=None):
+    """Get dashboard data with optional date filtering"""
+    try:
+        # Build base query for bills
+        bill_query = Bill.query
+        expense_query = Expense.query
+        
+        # Apply date filters
+        if from_date:
+            bill_query = bill_query.filter(Bill.date >= from_date)
+            expense_query = expense_query.filter(Expense.date >= from_date)
+        if to_date:
+            bill_query = bill_query.filter(Bill.date <= to_date)
+            expense_query = expense_query.filter(Expense.date <= to_date)
+            
+        bills = bill_query.all()
+        expenses = expense_query.all()
+        
+        # Calculate totals
+        total_expenses = sum(expense.amount for expense in expenses)
+        
+        total_bill_amount = 0
+        total_silver_amount = 0
+        net_fine = 0
+        
+        # Calculate net fine by item type
+        net_fine_by_item = {}
+        
+        for bill in bills:
+            item_name = bill.item or 'Other'
+            
+            if item_name not in net_fine_by_item:
+                net_fine_by_item[item_name] = 0
+            
+            if bill.payment_type == 'credit':
+                total_bill_amount += bill.total_amount
+                total_silver_amount += bill.silver_amount or 0
+                net_fine += bill.total_fine
+                net_fine_by_item[item_name] += bill.total_fine
+            else:  # debit
+                total_bill_amount -= bill.total_amount
+                total_silver_amount -= bill.silver_amount or 0
+                net_fine -= bill.total_fine
+                net_fine_by_item[item_name] -= bill.total_fine
+        
+        # Calculate rupee balance
+        rupee_balance = total_silver_amount - total_expenses
+        
+        return {
+            'total_expenses': total_expenses,
+            'total_bill_amount': total_bill_amount,
+            'total_silver_amount': total_silver_amount,
+            'net_fine': net_fine,
+            'net_fine_by_item': net_fine_by_item,
+            'balance_sheet': {
+                'rupee_balance': rupee_balance
+            }
+        }
+    except Exception as e:
+        print(f"Error in get_dashboard_data: {str(e)}")
+        return {}
 
 @expense_bp.route('/expenses', methods=['POST'])
 def create_expense():
     try:
         data = request.get_json()
-        if 'date' in data and isinstance(data['date'], str):
-            data['date'] = datetime.strptime(data['date'], '%Y-%m-%d').date()
-        expense = Expense.create(**data)
+        expense = Expense.create(
+            description=data['description'],
+            amount=data['amount'],
+            category=data['category'],
+            status=data.get('status', 'pending'),
+            date=data['date']
+        )
         return jsonify(expense.to_dict()), 201
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@expense_bp.route('/expenses', methods=['GET'])
-def get_expenses():
-    try:
-        expenses = Expense.get_all()
-        return jsonify([expense.to_dict() for expense in expenses]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -28,14 +114,19 @@ def get_expenses():
 def update_expense(expense_id):
     try:
         data = request.get_json()
-        if 'date' in data and isinstance(data['date'], str):
-            data['date'] = datetime.strptime(data['date'], '%Y-%m-%d').date()
-        expense = Expense.update(expense_id, data)
-        if expense:
-            return jsonify(expense.to_dict()), 200
-        else:
+        expense = Expense.get_by_id(expense_id)
+        if not expense:
             return jsonify({'error': 'Expense not found'}), 404
+        
+        for key, value in data.items():
+            if hasattr(expense, key):
+                setattr(expense, key, value)
+        
+        expense.updated_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify(expense.to_dict()), 200
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @expense_bp.route('/expenses/<int:expense_id>', methods=['DELETE'])
@@ -53,41 +144,12 @@ def delete_expense(expense_id):
         return jsonify({'error': str(e)}), 500
 
 @expense_bp.route('/expenses/dashboard', methods=['GET'])
-def get_expenses_dashboard():
+def get_dashboard():
     try:
-        # Calculate dashboard data
-        total_expenses = db.session.query(db.func.sum(Expense.amount)).scalar() or 0
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
         
-        # Calculate net fine from bills
-        credit_bills = Bill.query.filter_by(payment_type='credit').all()
-        debit_bills = Bill.query.filter_by(payment_type='debit').all()
-        
-        total_credit_fine = sum(bill.total_fine for bill in credit_bills)
-        total_debit_fine = sum(bill.total_fine for bill in debit_bills)
-        net_fine = total_credit_fine - total_debit_fine
-        
-        # Calculate total bill amounts
-        total_credit_amount = sum(bill.total_amount for bill in credit_bills)
-        total_debit_amount = sum(bill.total_amount for bill in debit_bills)
-        total_bill_amount = total_credit_amount - total_debit_amount
-        
-        # Calculate total silver amount
-        total_silver_amount = sum(bill.silver_amount for bill in credit_bills)
-        
-        # Calculate total wages weight
-        total_wages_weight = sum(bill.weight * (bill.wages/1000) for bill in Bill.query.all())
-        
-        dashboard_data = {
-            'total_expenses': total_expenses,
-            'net_fine': net_fine,
-            'total_bill_amount': total_bill_amount,
-            'total_silver_amount': total_silver_amount,
-            'total_wages_weight': total_wages_weight,
-            'balance_sheet': {
-                'silver_balance': net_fine,
-                'rupee_balance': total_bill_amount - total_expenses
-            }
-        }
+        dashboard_data = get_dashboard_data(from_date, to_date)
         return jsonify(dashboard_data), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

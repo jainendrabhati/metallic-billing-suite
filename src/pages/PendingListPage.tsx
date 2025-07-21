@@ -47,6 +47,38 @@ const PendingListPage = () => {
     enabled: expandedCustomers.size > 0,
   });
 
+  const groupBillsByItemType = (bills: any[]) => {
+    const grouped: Record<string, any[]> = {};
+    bills.forEach(bill => {
+      const itemType = bill.item || 'Other';
+      if (!grouped[itemType]) {
+        grouped[itemType] = [];
+      }
+      grouped[itemType].push(bill);
+    });
+    return grouped;
+  };
+
+  const calculateItemTypeTotals = (itemBills: any[]) => {
+    const creditBills = itemBills.filter(bill => bill.payment_type === 'credit');
+    const debitBills = itemBills.filter(bill => bill.payment_type === 'debit');
+    
+    const totalCreditFine = creditBills.reduce((sum, bill) => sum + bill.total_fine, 0);
+    const totalDebitFine = debitBills.reduce((sum, bill) => sum + bill.total_fine, 0);
+    const totalCreditAmount = creditBills.reduce((sum, bill) => sum + bill.total_amount, 0);
+    const totalDebitAmount = debitBills.reduce((sum, bill) => sum + bill.total_amount, 0);
+    
+    const netFine = totalCreditFine - totalDebitFine;
+    
+    return {
+      totalCreditFine,
+      totalDebitFine,
+      netFine,
+      creditBills,
+      debitBills
+    };
+  };
+
   const handleDownloadPDF = () => {
     const printContent = `
       <html>
@@ -56,11 +88,13 @@ const PendingListPage = () => {
             body { font-family: Arial, sans-serif; margin: 20px; }
             .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
             .logo { max-height: 60px; margin-bottom: 10px; }
-            .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            .table th, .table td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 12px; }
+            .customer-section { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; }
+            .customer-header { background-color: #f5f5f5; padding: 10px; margin-bottom: 15px; font-weight: bold; }
+            .item-type-header { background-color: #e8f4fd; padding: 8px; margin: 10px 0; font-weight: bold; }
+            .item-totals { background-color: #f9f9f9; padding: 8px; margin-bottom: 10px; }
+            .table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            .table th, .table td { border: 1px solid #000; padding: 6px; text-align: left; font-size: 10px; }
             .table th { background-color: #f0f0f0; font-weight: bold; }
-            .credit { color: green; font-weight: bold; }
-            .debit { color: red; font-weight: bold; }
             .banking-info { margin: 20px 0; }
             @media print { body { margin: 0; } }
           </style>
@@ -83,36 +117,57 @@ const PendingListPage = () => {
           </div>
 
           <h2>Pending Customers List</h2>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Customer Name</th>
-                <th>Mobile</th>
-                <th>Address</th>
-                <th>Total Fine (g)</th>
-                <th>Total Amount (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${pendingCustomers.map((customer: any) => `
-                <tr>
-                  <td>${customer.customer_name}</td>
-                  <td>${customer.customer_mobile}</td>
-                  <td>${customer.customer_address}</td>
-                  <td>
-                    ${customer.remaining_fine >= 0
-                      ? `Remaining Credit Fine: ${customer.remaining_fine.toFixed(2)}g`
-                      : `Remaining Debit Fine: ${Math.abs(customer.remaining_fine).toFixed(2)}g`}
-                  </td>
-                  <td>
-                    ${customer.remaining_amount >= 0
-                      ? `Remaining Credit Amount: ₹${customer.remaining_amount.toLocaleString()}`
-                      : `Remaining Debit Amount: ₹${Math.abs(customer.remaining_amount).toLocaleString()}`}
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+          ${pendingCustomers.map((customer: any) => {
+            const bills = customer.bills || [];
+            const groupedBills = groupBillsByItemType(bills);
+            
+            let customerContent = `
+              <div class="customer-section">
+                <div class="customer-header">
+                  ${customer.customer_name} | ${customer.customer_mobile} | ${customer.customer_address}
+                </div>
+            `;
+            
+            Object.entries(groupedBills).forEach(([itemType, itemBills]: [string, any[]]) => {
+              const totals = calculateItemTypeTotals(itemBills);
+              
+              customerContent += `
+                <div class="item-type-header">${itemType.toUpperCase()}</div>
+                <div class="item-totals">
+                  <strong>Credit:</strong> ${totals.totalCreditFine.toFixed(2)}g | 
+                  <strong>Debit:</strong> ${totals.totalDebitFine.toFixed(2)}g | 
+                  <strong>Net ${itemType}:</strong> ${totals.netFine.toFixed(2)}g ${totals.netFine >= 0 ? '(Credit)' : '(Debit)'}
+                </div>
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Slip No.</th>
+                      <th>Weight (g)</th>
+                      <th>Fine (g)</th>
+                      <th>Amount (₹)</th>
+                      <th>Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemBills.map((bill: any) => `
+                      <tr>
+                        <td>${format(new Date(bill.date), 'dd/MM/yyyy')}</td>
+                        <td>${bill.slip_no}</td>
+                        <td>${bill.weight?.toFixed(2) || 'N/A'}</td>
+                        <td>${bill.total_fine?.toFixed(2) || 'N/A'}${(bill.total_fine || 0) < 0 ? ' (Debit)' : ' (Credit)'}</td>
+                        <td>₹${bill.total_amount?.toFixed(2) || '0.00'}${(bill.total_amount || 0) < 0 ? ' (Debit)' : ' (Credit)'}</td>
+                        <td>${bill.payment_type?.toUpperCase() || 'N/A'}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              `;
+            });
+            
+            customerContent += '</div>';
+            return customerContent;
+          }).join('')}
           
           <div style="margin-top: 30px; text-align: center;">
             <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
@@ -224,53 +279,69 @@ const PendingListPage = () => {
                       <CollapsibleContent>
                         {expandedCustomers.has(customer.customer_id) && (
                           <div className="border-t border-gray-200 p-4 bg-gray-50">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                              <div>
-                                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                  <TrendingUp className="h-4 w-4 text-green-600" />
-                                  Credit Bills (Total: {customer.total_credit_fine.toFixed(2)}g, ₹{customer.total_credit_amount.toLocaleString()})
-                                </h4>
-                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                  {customerBills[customer.customer_id]?.filter((bill: any) => bill.payment_type === 'credit').map((bill: any) => (
-                                    <div key={bill.id} className="p-2 bg-green-50 rounded border border-green-200">
-                                      <div className="flex justify-between items-center">
+                            {customerBills[customer.customer_id] && (
+                              <>
+                                {Object.entries(groupBillsByItemType(customerBills[customer.customer_id])).map(([itemType, itemBills]: [string, any[]]) => {
+                                  const totals = calculateItemTypeTotals(itemBills);
+                                  
+                                  return (
+                                    <div key={itemType} className="mb-6">
+                                      <h4 className="font-semibold text-gray-800 mb-3 bg-blue-50 p-2 rounded">
+                                        {itemType.toUpperCase()} - Net: {totals.netFine.toFixed(2)}g {totals.netFine >= 0 ? '(Credit)' : '(Debit)'}
+                                      </h4>
+                                      
+                                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         <div>
-                                          <div className="font-medium text-sm">Bill #{bill.bill_number} - {bill.item_name}</div>
-                                          <div className="text-xs text-gray-600">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
+                                          <h5 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                            <TrendingUp className="h-4 w-4 text-green-600" />
+                                            Credit Bills ({totals.totalCreditFine.toFixed(2)}g)
+                                          </h5>
+                                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {totals.creditBills.map((bill: any) => (
+                                              <div key={bill.id} className="p-2 bg-green-50 rounded border border-green-200">
+                                                <div className="flex justify-between items-center">
+                                                  <div>
+                                                    <div className="font-medium text-sm">Bill #{bill.slip_no}</div>
+                                                    <div className="text-xs text-gray-600">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
+                                                  </div>
+                                                  <div className="text-right">
+                                                    <div className="text-sm font-semibold text-green-700">{bill.total_fine.toFixed(2)}g</div>
+                                                    <div className="text-sm text-green-600">₹{bill.total_amount.toFixed(2)}</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
-                                        <div className="text-right">
-                                          <div className="text-sm font-semibold text-green-700">{bill.total_fine.toFixed(2)}g</div>
-                                          <div className="text-sm text-green-600">₹{bill.total_amount.toFixed(2)}</div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
 
-                              <div>
-                                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                  <TrendingDown className="h-4 w-4 text-red-600" />
-                                  Debit Bills (Total: {customer.total_debit_fine.toFixed(4)}g, ₹{customer.total_debit_amount.toLocaleString()})
-                                </h4>
-                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                  {customerBills[customer.customer_id]?.filter((bill: any) => bill.payment_type === 'debit').map((bill: any) => (
-                                    <div key={bill.id} className="p-2 bg-red-50 rounded border border-red-200">
-                                      <div className="flex justify-between items-center">
                                         <div>
-                                          <div className="font-medium text-sm">Bill #{bill.bill_number} - {bill.item_name}</div>
-                                          <div className="text-xs text-gray-600">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-sm font-semibold text-red-700">{bill.total_fine.toFixed(4)}g</div>
-                                          <div className="text-sm text-red-600">₹{bill.total_amount.toFixed(2)}</div>
+                                          <h5 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                            <TrendingDown className="h-4 w-4 text-red-600" />
+                                            Debit Bills ({totals.totalDebitFine.toFixed(2)}g)
+                                          </h5>
+                                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {totals.debitBills.map((bill: any) => (
+                                              <div key={bill.id} className="p-2 bg-red-50 rounded border border-red-200">
+                                                <div className="flex justify-between items-center">
+                                                  <div>
+                                                    <div className="font-medium text-sm">Bill #{bill.slip_no}</div>
+                                                    <div className="text-xs text-gray-600">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
+                                                  </div>
+                                                  <div className="text-right">
+                                                    <div className="text-sm font-semibold text-red-700">{bill.total_fine.toFixed(2)}g</div>
+                                                    <div className="text-sm text-red-600">₹{bill.total_amount.toFixed(2)}</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
+                                  );
+                                })}
+                              </>
+                            )}
                           </div>
                         )}
                       </CollapsibleContent>

@@ -171,7 +171,7 @@ const BillingPage = () => {
       wastage,
       date,
     });
-    if (!customerName || !mobile || !address || !itemName || !item || !weight || !tunch || !wages || !wastage || !date) {
+    if (!customerName || !mobile || !address || !itemName || !item || !weight || !tunch  || !date) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",

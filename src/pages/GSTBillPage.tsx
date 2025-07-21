@@ -94,7 +94,7 @@ const GSTBillPage = () => {
     const cgstAmount = (totalAmountBeforeTax * cgstPercentage) / 100;
     const sgstAmount = (totalAmountBeforeTax * sgstPercentage) / 100;
     const igstAmount = (totalAmountBeforeTax * igstPercentage) / 100;
-    const grandTotal = totalAmountBeforeTax + cgstAmount + sgstAmount;
+    const grandTotal = totalAmountBeforeTax + cgstAmount + sgstAmount + igstAmount;
     
     return {
       totalAmountBeforeTax,
@@ -202,7 +202,7 @@ const GSTBillPage = () => {
                 <th width="10%">Weight</th>
                 <th width="10%">Rate</th>
                 <th width="15%">Amount</th>
-                <th width="10%">P</th>
+                
               </tr>
             </thead>
             <tbody>
@@ -214,7 +214,7 @@ const GSTBillPage = () => {
                   <td style="text-align: center;">${item.weight}</td>
                   <td style="text-align: right;">₹${item.rate.toFixed(2)}</td>
                   <td style="text-align: right;">₹${item.amount.toFixed(2)}</td>
-                  <td></td>
+                  
                 </tr>
               `).join('')}
               ${Array.from({ length: Math.max(0, 8 - items.length) }, (_, i) => `
@@ -225,7 +225,7 @@ const GSTBillPage = () => {
                   <td>&nbsp;</td>
                   <td>&nbsp;</td>
                   <td>&nbsp;</td>
-                  <td>&nbsp;</td>
+                 
                 </tr>
               `).join('')}
             </tbody>
@@ -257,7 +257,7 @@ const GSTBillPage = () => {
                     </tr>
                     <tr>
                       <td style="border: 1px solid #000; padding: 5px;">IGST@ ${igstPercentage}%</td>
-                      <td style="border: 1px solid #000; padding: 5px; text-align: right;">₹0.00</td>
+                      <td style="border: 1px solid #000; padding: 5px; text-align: right;">₹${totals.igstAmount.toFixed(2)}</td>
                     </tr>
                     <tr>
                       <td style="border: 1px solid #000; padding: 5px; font-weight: bold;">Grand Total</td>
@@ -513,6 +513,10 @@ const GSTBillPage = () => {
                           <div className="flex justify-between">
                             <span>SGST ({sgstPercentage}%):</span>
                             <span>₹{totals.sgstAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>IGST ({igstPercentage}%):</span>
+                            <span>₹{totals.igstAmount.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between font-bold text-lg border-t pt-2">
                             <span>Grand Total:</span>

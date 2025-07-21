@@ -1,4 +1,3 @@
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 
@@ -597,16 +596,22 @@ export const stockItemAPI = {
 };
 
 export const expenseAPI = {
-  getAll: async () => {
-    const response = await fetch(`${API_BASE_URL}/expenses`);
+  getAll: async (startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    const response = await fetch(`${API_BASE_URL}/expenses?${params.toString()}`);
     if (!response.ok) {
       throw new Error("Failed to fetch expenses");
     }
     return response.json();
   },
 
-  getDashboard: async () => {
-    const response = await fetch(`${API_BASE_URL}/expenses/dashboard`);
+  getDashboard: async (startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    const response = await fetch(`${API_BASE_URL}/expenses/dashboard?${params.toString()}`);
     if (!response.ok) {
       throw new Error("Failed to fetch expenses dashboard");
     }
@@ -662,13 +667,17 @@ export const settingsAPI = {
   },
 
   updateFirmSettings: async (settingsData: any) => {
+    
     const response = await fetch(`${API_BASE_URL}/settings`, {
+      
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(settingsData),
+      // headers: {
+      //   "Content-Type": "application/json",
+      // },
+      
+      body: settingsData,
     });
+    
     if (!response.ok) {
       throw new Error("Failed to update firm settings");
     }

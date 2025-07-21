@@ -25,11 +25,42 @@ def get_settings():
 @dashboard_bp.route('/settings', methods=['PUT'])
 def update_settings():
     try:
-        data = request.get_json()
-        settings = Settings.update_settings(**data)
+        form = request.form
+        files = request.files
+
+        # Read form fields
+        firm_name = form.get('firm_name')
+        gst_number = form.get('gst_number')
+        address = form.get('address')
+        city = form.get('city')
+        account_number = form.get('account_number')
+        account_holder_name = form.get('account_holder_name')
+        ifsc_code = form.get('ifsc_code')
+        branch_address = form.get('branch_address')
+
+        # Handle file upload (firm logo)
+        firm_logo = files.get('firm_logo')
+        if firm_logo:
+            firm_logo.save(f"static/uploads/{firm_logo.filename}")  # or handle it your way
+
+        # Update your model
+        settings = Settings.update_settings(
+            firm_name=firm_name,
+            gst_number=gst_number,
+            address=address,
+            city=city,
+            account_number=account_number,
+            account_holder_name=account_holder_name,
+            ifsc_code=ifsc_code,
+            branch_address=branch_address,
+            firm_logo_filename=firm_logo.filename if firm_logo else None
+        )
+
         return jsonify(settings.to_dict()), 200
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 # Google Drive Settings APIs
 @dashboard_bp.route('/google-drive/settings', methods=['GET'])

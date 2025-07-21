@@ -244,22 +244,83 @@ const TransactionsPage = () => {
 
   const handlePrintTransaction = (transaction: any) => {
     const printContent = `
-      <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2>Transaction Details</h2>
-        <p><strong>Bill Number:</strong> ${transaction.bill_number || 'N/A'}</p>
-        <p><strong>Customer:</strong> ${transaction.customer_name}</p>
-        <p><strong>Amount:</strong> ₹${transaction.amount}</p>
-        <p><strong>Type:</strong> ${transaction.transaction_type}</p>
-        <p><strong>Description:</strong> ${transaction.description}</p>
-        ${transaction.weight ? `<p><strong>Weight:</strong> ${transaction.weight} grams</p>` : ''}
-        ${transaction.tunch ? `<p><strong>Tunch:</strong> ${transaction.tunch}%</p>` : ''}
-        ${transaction.wages ? `<p><strong>Wages:</strong> ₹${transaction.wages}</p>` : ''}
-        ${transaction.wastage ? `<p><strong>Wastage:</strong> ${transaction.wastage}%</p>` : ''}
-        ${transaction.total_wages ? `<p><strong>Total Wages:</strong> ₹${transaction.total_wages/1000}</p>` : ''}
-        ${transaction.silver_amount ? `<p><strong>Silver Amount:</strong> ₹${transaction.silver_amount}</p>` : ''}
-        ${transaction.item_name ? `<p><strong>Item Name:</strong> ${transaction.item_name}</p>` : ''}
-        ${transaction.item ? `<p><strong>Item Type:</strong> ${transaction.item}</p>` : ''}
-      </div>
+      <html>
+        <head>
+          <title>Bill ${transaction.bill_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .bill-details { margin: 20px 0; }
+            .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .table th, .table td { border: 1px solid #000; padding: 8px; text-align: left; }
+            .table th { background-color: #f0f0f0; }
+            .footer { margin-top: 30px; text-align: center; }
+            .signature { margin-top: 50px; }
+            @media print { 
+              body { margin: 0; } 
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Metalic Jewelers</h1>
+          </div>
+          <div class="bill-details">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+              <div>
+                <p><strong>Bill No:</strong> ${transaction.bill_number || 'N/A'}</p>
+                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p><strong>Customer:</strong> ${transaction.customer_name}</p>
+                <p><strong>Type:</strong> ${transaction.transaction_type?.toUpperCase()}</p>
+              </div>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Weight (g)</th>
+                  <th>Tunch</th>
+                  <th>Wastage</th>
+                  <th>Wages</th>
+                  <th>Total Fine (g)</th>
+                  ${transaction.transaction_type === 'credit' ? '<th>Silver Amount</th>' : ''}
+                  <th>Total Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>${transaction.item || transaction.item_name || 'N/A'}</td>
+                  <td>${transaction.weight?.toFixed(2) || 'N/A'}</td>
+                  <td>${transaction.tunch?.toFixed(2) || 'N/A'}</td>
+                  <td>${transaction.wastage?.toFixed(2) || 'N/A'}</td>
+                  <td>${transaction.wages?.toFixed(2) || 'N/A'}</td>
+                  <td>${transaction.total_fine?.toFixed(2) || 'N/A'}</td>
+                  ${transaction.transaction_type === 'credit' ? `<td>₹${transaction.silver_amount?.toFixed(2) || '0.00'}</td>` : ''}
+                  <td>₹${transaction.amount?.toFixed(2) || '0.00'}</td>
+                </tr>
+              </tbody>
+            </table>
+            ${transaction.description ? `<div><p><strong>Description:</strong> ${transaction.description}</p></div>` : ''}
+          </div>
+          <div class="footer">
+            <div class="signature">
+              <div style="display: flex; justify-content: space-between; margin-top: 50px;">
+                <div>
+                  <p>_________________</p>
+                  <p>Customer Signature</p>
+                </div>
+                <div>
+                  <p>_________________</p>
+                  <p>Authorized Signature</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
     `;
     
     const printWindow = window.open('', '_blank');
@@ -378,7 +439,7 @@ const TransactionsPage = () => {
                         {transaction.transaction_type}
                       </span>
                     </TableCell>
-                    <TableCell>{transaction.description}</TableCell>
+                    <TableCell>{transaction.description || 'None'}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button 

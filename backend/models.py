@@ -562,6 +562,20 @@ class Expense(db.Model):
             expense.updated_at = datetime.utcnow()
             db.session.commit()
         return expense
+    
+    @classmethod
+    def get_filtered(cls, start_date=None, end_date=None):
+        query = cls.query
+        
+        if start_date:
+            start_datetime = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(cls.date >= start_datetime)
+        
+        if end_date:
+            end_datetime = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(cls.date <= end_datetime)
+        
+        return query.order_by(cls.created_at.desc()).all()
 
 class BillItem(db.Model):
     __tablename__ = 'bill_items'
