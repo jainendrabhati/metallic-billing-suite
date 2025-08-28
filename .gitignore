@@ -30,4 +30,5 @@ release/
 backend/__pycache__/
 backend/envs/
 backend/envs/*
+backend/flask_log.txt
 release
