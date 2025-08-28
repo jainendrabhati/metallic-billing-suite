@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
 from sqlalchemy import or_, and_
+from google_drive_models import GoogleDriveAuth
 
 db = SQLAlchemy()
 
@@ -614,11 +615,15 @@ class Settings(db.Model):
     gst_number = db.Column(db.String(50))
     address = db.Column(db.Text)
     city = db.Column(db.String(100))
+    mobile = db.Column(db.String(15))
+    email = db.Column(db.String(100))
     account_number = db.Column(db.String(50))
     account_holder_name = db.Column(db.String(200))
     ifsc_code = db.Column(db.String(20))
     branch_address = db.Column(db.Text)
-    logo_path = db.Column(db.String(500))
+    firm_logo_url = db.Column(db.String(500))
+    backup_time = db.Column(db.String(10), default='20:00')  # Format: HH:MM
+    auto_backup_enabled = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -629,11 +634,15 @@ class Settings(db.Model):
             'gst_number': self.gst_number,
             'address': self.address,
             'city': self.city,
+            'mobile': self.mobile,
+            'email': self.email,
             'account_number': self.account_number,
             'account_holder_name': self.account_holder_name,
             'ifsc_code': self.ifsc_code,
             'branch_address': self.branch_address,
-            'logo_path': self.logo_path,
+            'firm_logo_url': self.firm_logo_url,
+            'backup_time': self.backup_time,
+            'auto_backup_enabled': self.auto_backup_enabled,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -721,6 +730,8 @@ class GoogleDriveSettings(db.Model):
         }
         
 class License(db.Model):
+    __tablename__ = 'licenses'
+    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     activation_key = db.Column(db.String(255), nullable=False)
@@ -731,10 +742,67 @@ class License(db.Model):
         return {
             'id': self.id,
             'name': self.name,
-            'activation_key': self.activation_key,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'activation_key': self.activation_key,    
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+    @classmethod
+    def create(cls, **kwargs):
+        item = cls(**kwargs)
+        db.session.add(item)
+        db.session.commit()
+        return item
+    
+class GSTCustomer(db.Model):
+    __tablename__ = 'gst_customers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    customer_name = db.Column(db.String(200), nullable=False)
+    customer_address = db.Column(db.Text, nullable=True)
+    customer_gstin = db.Column(db.String(15), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Unique constraint to avoid duplicate customers
+    __table_args__ = (db.UniqueConstraint('customer_name', 'customer_gstin', name='unique_customer_gstin'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'customer_name': self.customer_name,
+            'customer_address': self.customer_address,
+            'customer_gstin': self.customer_gstin,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    @classmethod
+    def create_or_update(cls, customer_name, customer_address=None, customer_gstin=None):
+        # Try to find existing customer by name and GSTIN
+        existing = cls.query.filter_by(customer_name=customer_name, customer_gstin=customer_gstin).first()
+        
+        if existing:
+            # Update existing customer data
+            if customer_address:
+                existing.customer_address = customer_address
+            existing.updated_at = datetime.utcnow()
+            db.session.commit()
+            return existing
+        else:
+            # Create new customer
+            customer = cls(
+                customer_name=customer_name,
+                customer_address=customer_address,
+                customer_gstin=customer_gstin
+            )
+            db.session.add(customer)
+            db.session.commit()
+            return customer
+
+    @classmethod
+    def search_by_name(cls, name_query):
+        return cls.query.filter(cls.customer_name.ilike(f'%{name_query}%')).limit(10).all()
 
 class GSTBill(db.Model):
     __tablename__ = 'gst_bills'
@@ -753,6 +821,8 @@ class GSTBill(db.Model):
     sgst_amount = db.Column(db.Float, nullable=False, default=0.0)
     igst_amount = db.Column(db.Float, nullable=False, default=0.0)
     grand_total = db.Column(db.Float, nullable=False, default=0.0)
+    time = db.Column(db.String(10), nullable=True)  # Format: HH:MM
+    place = db.Column(db.String(255), nullable=True)
     amount_in_words = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -765,6 +835,8 @@ class GSTBill(db.Model):
             'id': self.id,
             'bill_number': self.bill_number,
             'date': self.date.isoformat() if self.date else None,
+            'time': self.time,
+            'place': self.place,
             'customer_name': self.customer_name,
             'customer_address': self.customer_address,
             'customer_gstin': self.customer_gstin,
@@ -798,7 +870,7 @@ class GSTBill(db.Model):
 
     @classmethod
     def create(cls, **kwargs):
-        kwargs['bill_number'] = cls.generate_bill_number()
+        # kwargs['bill_number'] = cls.generate_bill_number()
         bill = cls(**kwargs)
         db.session.add(bill)
         db.session.flush()  # Get the bill ID

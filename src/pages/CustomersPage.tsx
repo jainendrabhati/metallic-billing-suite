@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,27 +7,68 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Search, UserPlus, Phone, MapPin, Users, Eye, FileText, Download, Calendar, Edit } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Search, UserPlus, Phone, MapPin, Users, Eye, FileText, Download, Calendar, Edit, Plus } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customerAPI, billAPI } from "@/services/api";
-import { format } from "date-fns";
+import { format, intlFormat } from "date-fns";
 import AppSidebar from "@/components/AppSidebar";
 import Navbar from "@/components/Navbar";
 import { useSidebar } from "@/components/SidebarProvider";
 import EditCustomerDialog from "@/components/EditCustomerDialog";
+import { useToast } from "@/hooks/use-toast";
+import { generatePDFHeader, generateBankDetailsSection } from "@/components/PDFTemplateHeader";
+import { settingsAPI } from "@/services/api";
+
 
 const CustomersPage = () => {
   const { isOpen } = useSidebar();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  
+  
+  // Create customer form state
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerMobile, setNewCustomerMobile] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: customerAPI.getAll,
+  });
+
+  const { data: firmSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsAPI.getFirmSettings(),
+  });
+
+  // Create customer mutation
+  const createCustomerMutation = useMutation({
+    mutationFn: customerAPI.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast({
+        title: "Success",
+        description: "Customer created successfully!",
+      });
+      setIsCreateDialogOpen(false);
+      setNewCustomerName("");
+      setNewCustomerMobile("");
+      setNewCustomerAddress("");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create customer.",
+        variant: "destructive",
+      });
+    },
   });
 
   const { data: bills = [] } = useQuery({
@@ -95,7 +137,7 @@ const CustomersPage = () => {
   const groupBillsByItemType = (customerBills: any[]) => {
     const grouped: Record<string, any[]> = {};
     customerBills.forEach(bill => {
-      const itemType = bill.item  || 'Other';
+      const itemType =  bill.item || 'Other';
       if (!grouped[itemType]) {
         grouped[itemType] = [];
       }
@@ -141,9 +183,9 @@ const CustomersPage = () => {
           <html>
             <head>
               <title>Customer Details - ${customer.name}</title>
-              <style>
+               <style>
                 @page { 
-                  size: landscape; 
+                  size: portrait; 
                   margin: 0.5in; 
                 }
                 body { 
@@ -201,17 +243,31 @@ const CustomersPage = () => {
                   border-collapse: collapse; 
                   margin-top: 10px;
                   margin-bottom: 20px;
+                  table-layout: fixed;
                 }
                 th, td { 
                   border: 1px solid #ddd; 
-                  padding: 8px; 
+                  padding: 4px; 
                   text-align: left;
-                  font-size: 10px;
+                  font-size: 9px;
+                  word-wrap: break-word;
+                  overflow: hidden;
                 }
                 th { 
                   background-color: #f5f5f5; 
                   font-weight: bold;
                 }
+                th:nth-child(1), td:nth-child(1) { width: 8%; } /* Date */
+                th:nth-child(2), td:nth-child(2) { width: 8%; } /* Slip No */
+                th:nth-child(3), td:nth-child(3) { width: 12%; } /* Item Name */
+                th:nth-child(4), td:nth-child(4) { width: 8%; } /* Weight */
+                th:nth-child(5), td:nth-child(5) { width: 8%; } /* Tunch */
+                th:nth-child(6), td:nth-child(6) { width: 8%; } /* Wastage */
+                th:nth-child(7), td:nth-child(7) { width: 8%; } /* Wages */
+                th:nth-child(8), td:nth-child(8) { width: 10%; } /* Total Fine */
+                th:nth-child(9), td:nth-child(9) { width: 10%; } /* Total Amount */
+                th:nth-child(10), td:nth-child(10) { width: 12%; } /* Description */
+                th:nth-child(11), td:nth-child(11) { width: 8%; } /* Type */
                 .date-filter { 
                   text-align: center; 
                   margin-bottom: 15px; 
@@ -252,58 +308,74 @@ const CustomersPage = () => {
       
       itemTypeSections += `
         <div class="item-type-header">${itemType.toUpperCase()}</div>
-        <div class="item-totals">
-          <strong>Credit:</strong> ${totals.totalCreditFine.toFixed(2)}g, ₹${totals.totalCreditAmount.toFixed(2)} | 
-          <strong>Debit:</strong> ${totals.totalDebitFine.toFixed(2)}g, ₹${totals.totalDebitAmount.toFixed(2)} | 
-          <strong>Total ${itemType}:</strong> ${totals.netFine.toFixed(2)}g ${totals.netFine >= 0 ? '(Credit)' : '(Debit)'}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Slip No.</th>
-              <th>Weight (g)</th>
-              <th>Tunch (%)</th>
-              <th>Wastage (%)</th>
-              <th>Wages</th>
-              <th>Total Fine (g)</th>
-              <th>Total Amount</th>
-              <th>Description</th>
-              <th>Type</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemBills.map(bill => `
-              <tr>
-                <td>${format(new Date(bill.date), 'dd/MM/yyyy')}</td>
-                <td>${bill.slip_no}</td>
-                <td>${bill.weight?.toFixed(2) || 'N/A'}</td>
-                <td>${bill.tunch?.toFixed(2) || 'N/A'}</td>
-                <td>${bill.wastage?.toFixed(2) || 'N/A'}</td>
-                <td>₹${bill.wages?.toFixed(2) || '0.00'}</td>
-                <td>${bill.total_fine?.toFixed(2) || 'N/A'}${(bill.total_fine || 0) < 0 ? ' (Debit)' : ' (Credit)'}</td>
-                <td>₹${bill.total_amount?.toFixed(2) || '0.00'}${(bill.total_amount || 0) < 0 ? ' (Debit)' : ' (Credit)'}</td>
-                <td>${bill.description || 'N/A'}</td>
-                <td>${bill.payment_type?.toUpperCase() || 'N/A'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <div class="item-totals" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+  <!-- Left side: First 3 items -->
+  <div style="display: flex; gap: 12px;">
+    <strong>Total Credited Amount:</strong> ₹${totals.totalCreditAmount.toFixed(2)} | 
+    <strong>Total Debited Amount:</strong> ₹${totals.totalDebitAmount.toFixed(2)} | 
+    <strong>Total Amount :</strong> ₹${totals.netAmount.toFixed(2)} 
+  </div>
+
+  <!-- Right side: Next 3 items -->
+  <div style="display: flex; gap: 12px;">
+    <strong>Total Credited ${itemType} Fine:</strong> ${totals.totalCreditFine.toFixed(2)}g | 
+    <strong>Total Debited ${itemType} Fine:</strong> ${totals.totalDebitFine.toFixed(2)}g | 
+    <strong>Total ${itemType}:</strong> ${totals.netFine.toFixed(2)}g 
+  </div>
+</div>
+       <table>
+  <thead>
+    <tr>
+      <th style="text-align: center;">Date</th>
+      <th style="text-align: center;">Slip No.</th>
+      <th style="text-align: center;">Item Name</th>
+      <th style="text-align: center;">Weight (g)</th>
+      <th style="text-align: center;">Tunch (%)</th>
+      <th style="text-align: center;">Wastage (%)</th>
+      <th style="text-align: center;">Wages</th>
+      <th style="text-align: center;">Total Fine (g)</th>
+      <th style="text-align: center;">Total Amount</th>
+      <th style="text-align: center;">Description</th>
+      <th style="text-align: center;">Type</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${itemBills
+      .slice()
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map(
+        (bill) => `
+        <tr>
+          <td style="text-align: center;">${format(new Date(bill.date), 'dd/MM/yyyy')}</td>
+          <td style="text-align: center;">${bill.slip_no}</td>
+          <td style="text-align: center;">${bill.item_name}</td>
+          <td style="text-align: center;">${bill.weight?.toFixed(2) || 'N/A'}</td>
+          <td style="text-align: center;">${bill.tunch?.toFixed(2) || 'N/A'}</td>
+          <td style="text-align: center;">${bill.wastage?.toFixed(2) || 'N/A'}</td>
+          <td style="text-align: center;">₹${bill.wages?.toFixed(2) || '0.00'}</td>
+          <td style="text-align: center;">${bill.total_fine?.toFixed(2) || 'N/A'}</td>
+          <td style="text-align: center;">₹${bill.total_amount?.toFixed(2) || '0.00'}</td>
+          <td style="text-align: center;">${bill.description || 'N/A'}</td>
+          <td style="text-align: center;">${bill.payment_type?.toUpperCase() || 'N/A'}</td>
+        </tr>
+      `
+      )
+      .join('')}
+  </tbody>
+</table>
+
       `;
     });
 
     return `
       <div class="header">
-        <h1>Customer Details Report</h1>
-        <div class="date-filter">${dateRange}</div>
+        ${generatePDFHeader({ firmSettings, title: "BILL RECEIPT" })}
       </div>
       
       <div class="customer-info">
         <div class="info-section">
           <div class="info-title">Personal Information</div>
-          <div class="info-item">
-            <span class="info-label">Customer ID:</span> CUST-${customer.id.toString().padStart(4, '0')}
-          </div>
+          
           <div class="info-item">
             <span class="info-label">Name:</span> ${customer.name}
           </div>
@@ -330,6 +402,23 @@ const CustomersPage = () => {
     `;
   };
 
+  const handleCreateCustomer = () => {
+    if (!newCustomerName || !newCustomerMobile || !newCustomerAddress) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    createCustomerMutation.mutate({
+      name: newCustomerName,
+      mobile: newCustomerMobile,
+      address: newCustomerAddress,
+    });
+  };
+
   const clearDateFilter = () => {
     setFromDate("");
     setToDate("");
@@ -352,21 +441,30 @@ const CustomersPage = () => {
         <Navbar />
         <div className="h-screen overflow-hidden bg-gray-50 flex flex-col">
           <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Customer Management</h1>
-                <p className="text-gray-600 text-sm">Comprehensive customer database and relationship management</p>
-              </div>
-              <div className="relative w-80">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search customers by name or mobile..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-white border-gray-300 focus:border-blue-500"
-                />
-              </div>
-            </div>
+             <div className="flex items-center justify-between mb-4">
+               <div>
+                 <h1 className="text-2xl font-bold text-gray-900">Customer Management</h1>
+                 <p className="text-gray-600 text-sm">Comprehensive customer database and relationship management</p>
+               </div>
+               <div className="flex items-center gap-4">
+                 <Button 
+                   onClick={() => setIsCreateDialogOpen(true)}
+                   className="bg-blue-600 hover:bg-blue-700 text-white"
+                 >
+                   <Plus className="h-4 w-4 mr-2" />
+                   Add Customer
+                 </Button>
+                 <div className="relative w-80">
+                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                   <Input
+                     placeholder="Search customers by name or mobile..."
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                     className="pl-10 bg-white border-gray-300 focus:border-blue-500"
+                   />
+                 </div>
+               </div>
+             </div>
             
             {/* Date Filter Section */}
             <Card className="mb-4">
@@ -422,14 +520,19 @@ const CustomersPage = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredCustomers.map((customer) => {
-                  const customerBills = getCustomerBills(customer.id);
-                  const totalFine = customerBills.reduce((sum, bill) => {
-                    return sum + (bill.payment_type === 'credit' ? bill.total_fine : -bill.total_fine);
-                  }, 0);
-                  const totalAmount = customerBills.reduce((sum, bill) => {
-                    return sum + (bill.payment_type === 'credit' ? bill.total_amount : -bill.total_amount);
-                  }, 0);
+                {filteredCustomers
+                    .slice() // avoid mutating original array
+                    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+                    .map((customer) => {
+                      const customerBills = getCustomerBills(customer.id);
+
+                      const totalFine = customerBills.reduce((sum, bill) => 
+                        sum + (bill.payment_type === 'credit' ? bill.total_fine : -bill.total_fine),
+                      0);
+
+                      const totalAmount = customerBills.reduce((sum, bill) => 
+                        sum + (bill.payment_type === 'credit' ? bill.total_amount : -bill.total_amount),
+                      0);
 
                   return (
                     <Card key={customer.id} className="border border-gray-200 hover:shadow-md transition-shadow">
@@ -454,7 +557,7 @@ const CustomersPage = () => {
                               <div className="font-semibold text-gray-900">{customerBills.length}</div>
                               <div className="text-sm text-gray-500">Bills</div>
                             </div>
-                           
+                            
                             
                             <Button 
                               variant="outline" 
@@ -527,16 +630,7 @@ const CustomersPage = () => {
                                             <label className="text-sm font-medium text-gray-600">Total Bills</label>
                                             <p className="text-2xl font-bold text-blue-600">{getCustomerBills(selectedCustomer.id).length}</p>
                                           </div>
-                                          <div>
-                                            <label className="text-sm font-medium text-gray-600">Total Fine</label>
-                                            <p className="text-2xl font-bold text-green-600">
-                                              {getCustomerBills(selectedCustomer.id).reduce((sum, bill) => 
-                                                sum + (bill.payment_type === 'credit' ? bill.total_fine : -bill.total_fine), 0
-                                              ).toFixed(2)}g {getCustomerBills(selectedCustomer.id).reduce((sum, bill) => 
-                                                sum + (bill.payment_type === 'credit' ? bill.total_fine : -bill.total_fine), 0
-                                              ) < 0 ? '(Debit)' : '(Credit)'}
-                                            </p>
-                                          </div>
+                                          
                                           <div>
                                             <label className="text-sm font-medium text-gray-600">Total Remaining Amount</label>
                                             <p className="text-2xl font-bold text-blue-600">
@@ -574,6 +668,7 @@ const CustomersPage = () => {
                                                   <TableRow>
                                                     <TableHead>Date</TableHead>
                                                     <TableHead>Slip No.</TableHead>
+                                                    <TableHead>Item Name</TableHead>
                                                     <TableHead>Weight (g)</TableHead>
                                                     <TableHead>Tunch (%)</TableHead>
                                                     <TableHead>Wastage (%)</TableHead>
@@ -589,13 +684,14 @@ const CustomersPage = () => {
                                                     <TableRow key={bill.id}>
                                                       <TableCell>{format(new Date(bill.date), 'dd/MM/yyyy')}</TableCell>
                                                       <TableCell className="font-medium">{bill.slip_no}</TableCell>
+                                                      <TableCell className="font-medium">{bill.item_name}</TableCell>
                                                       <TableCell>{bill.weight.toFixed(2)}</TableCell>
                                                       <TableCell>{bill.tunch.toFixed(2)}</TableCell>
                                                       <TableCell>{bill.wastage.toFixed(2)}</TableCell>
                                                       <TableCell>₹{bill.wages.toFixed(2)}</TableCell>
-                                                      <TableCell>{bill.total_fine.toFixed(2)}{bill.total_fine < 0 ? ' (Debit)' : ' (Credit)'}</TableCell>
+                                                      <TableCell>{bill.total_fine.toFixed(2)}</TableCell>
                                                       <TableCell>{bill.description || 'None'}</TableCell>
-                                                      <TableCell className="font-semibold text-green-600">₹{bill.total_amount.toFixed(2)}{bill.total_amount < 0 ? ' (Debit)' : ' (Credit)'}</TableCell>
+                                                      <TableCell className="font-semibold text-green-600">₹{bill.total_amount.toFixed(2)}</TableCell>
                                                       <TableCell>
                                                         <Badge 
                                                           variant={bill.payment_type === 'credit' ? 'default' : 'secondary'}
@@ -628,6 +724,60 @@ const CustomersPage = () => {
           </div>
         </div>
       </div>
+      
+      {/* Create Customer Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Customer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div>
+              <Label htmlFor="customerName">Customer Name</Label>
+              <Input
+                id="customerName"
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                placeholder="Enter customer name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customerMobile">Mobile Number</Label>
+              <Input
+                id="customerMobile"
+                value={newCustomerMobile}
+                onChange={(e) => setNewCustomerMobile(e.target.value)}
+                placeholder="Enter mobile number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customerAddress">Address</Label>
+              <Input
+                id="customerAddress"
+                value={newCustomerAddress}
+                onChange={(e) => setNewCustomerAddress(e.target.value)}
+                placeholder="Enter address"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateCustomer}
+                disabled={createCustomerMutation.isPending}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {createCustomerMutation.isPending ? "Creating..." : "Create Customer"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       <EditCustomerDialog 
         customer={editingCustomer}

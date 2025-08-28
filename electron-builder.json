@@ -1,6 +1,6 @@
 {
   "appId": "com.yourcompany.jewelryapp",
-  "productName": "Jewelry Management System",
+  "productName": "Silvertally",
   "directories": {
     "output": "release",
     "buildResources": "assets"
@@ -34,24 +34,13 @@
     ],
     "icon": "assets/icon.ico",
     "requestedExecutionLevel": "requireAdministrator"
-    
-  },
-  "mac": {
-    "target": "dmg",
-    "icon": "assets/icon.icns",
-    "category": "public.app-category.business"
-  },
-  "linux": {
-    "target": "AppImage",
-    "icon": "assets/icon.png",
-    "category": "Office"
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Jewelry Management System",
+    "shortcutName": "Silvertally",
     "runAfterFinish": true,
     "allowElevation": true,
     "installerHeaderIcon": "assets/icon.ico",
@@ -59,8 +48,6 @@
     "installerIcon": "assets/icon.ico",
     "perMachine": true
   },
-  "nodeGypRebuild": false,
-  "buildDependenciesFromSource": false,
   "publish": {
     "provider": "generic",
     "url": "https://your-update-server.com"

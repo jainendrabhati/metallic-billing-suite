@@ -1,38 +1,95 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Users, CreditCard, TrendingUp, TrendingDown, Package, Clock, DollarSign } from "lucide-react";
+import { FileText, Users, CreditCard, TrendingUp, TrendingDown, Package, Clock, DollarSign, HardHat, Wifi, WifiOff} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { customerAPI, billAPI, transactionAPI, expenseAPI } from "@/services/api";
+import { customerAPI, billAPI, transactionAPI, expenseAPI, settingsAPI } from "@/services/api";
 import { format } from "date-fns";
 import AppSidebar from "@/components/AppSidebar";
 import { useSidebar } from "@/components/SidebarProvider";
 import Navbar from "@/components/Navbar";
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { offlineService } from "@/services/offlineService";
 
 const Dashboard = () => {
   const { isOpen } = useSidebar();
   const navigate = useNavigate();
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
 
-  // Fetch data
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Fetch data with offline support
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
-    queryFn: customerAPI.getAll,
+    queryFn: isOnline ? customerAPI.getAll : () => offlineService.getCustomers(),
+    staleTime: isOnline ? 0 : Infinity,
   });
 
   const { data: bills = [] } = useQuery({
     queryKey: ['bills'],
-    queryFn: billAPI.getAll,
+    queryFn: isOnline ? billAPI.getAll : () => offlineService.getBills(),
+    staleTime: isOnline ? 0 : Infinity,
+  });
+
+  const { data: pendingCustomers = [] } = useQuery({
+    queryKey: ['customers', 'pending'],
+    queryFn: isOnline ? customerAPI.getPendingList : () => offlineService.getPendingList(),
+    staleTime: isOnline ? 0 : Infinity,
+  });
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: isOnline ? () => fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/employees`).then(r => r.json()) : () => offlineService.getEmployees(),
+    staleTime: isOnline ? 0 : Infinity,
   });
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['transactions'],
-    queryFn: () => transactionAPI.getAll(),
+    queryFn: isOnline ? () => transactionAPI.getAll() : () => offlineService.getTransactions(),
+    staleTime: isOnline ? 0 : Infinity,
   });
 
   const { data: expenses = [] } = useQuery({
     queryKey: ['expenses'],
-    queryFn: () => expenseAPI.getAll(),
+    queryFn: isOnline ? () => expenseAPI.getAll() : () => offlineService.getExpenses(),
+    staleTime: isOnline ? 0 : Infinity,
   });
+
+  const { data: firmSettings } = useQuery({
+    queryKey: ['firmSettings'],
+    queryFn: isOnline ? settingsAPI.getFirmSettings : () => offlineService.getSettings(),
+    staleTime: isOnline ? 0 : Infinity,
+  });
+
+  // Fetch dashboard statistics
+  const { data: dashboardData } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: async () => {
+      if (!isOnline) return null;
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/dashboard`);
+      return response.json();
+    },
+    enabled: isOnline,
+  });
+
+  // Update dashboard stats when data changes
+  useEffect(() => {
+    if (dashboardData) {
+      setDashboardStats(dashboardData);
+    }
+  }, [dashboardData]);
 
   // Calculate statistics
   const totalRevenue = bills.reduce((sum, bill) => sum + bill.total_amount, 0);
@@ -46,95 +103,112 @@ const Dashboard = () => {
       value: bills.length.toString(),
       change: `+${bills.length > 10 ? Math.round((bills.length / (bills.length - 10)) * 100 - 100) : 0}%`,
       icon: FileText,
-      color: "text-blue-600",
-      bgColor: "bg-gradient-to-br from-blue-100 to-blue-200",
-      cardBg: "bg-gradient-to-br from-blue-50 to-blue-100",
-      borderColor: "border-blue-200",
+      color: "text-white",
+      bgColor: "bg-white/20",
+      cardBg: "bg-gradient-to-br from-blue-600 to-blue-700",
+      borderColor: "border-blue-300",
+      hoverBg: "hover:bg-gradient-to-br hover:from-blue-700 hover:to-blue-800",
     },
     {
       title: "Customers",
       value: customers.length.toString(),
       change: `+${customers.length > 5 ? Math.round((customers.length / (customers.length - 5)) * 100 - 100) : 0}%`,
       icon: Users,
-      color: "text-green-600",
-      bgColor: "bg-gradient-to-br from-green-100 to-green-200",
-      cardBg: "bg-gradient-to-br from-green-50 to-green-100",
-      borderColor: "border-green-200",
+      color: "text-white",
+      bgColor: "bg-white/20",
+      cardBg: "bg-gradient-to-br from-blue-600 to-blue-700",
+      borderColor: "border-blue-300",
+      hoverBg: "hover:bg-gradient-to-br hover:from-blue-700 hover:to-blue-800",
     },
     {
-      title: "Revenue",
-      value: `₹${totalRevenue.toLocaleString()}`,
-      change: "+15%",
-      icon: DollarSign,
-      color: "text-purple-600",
-      bgColor: "bg-gradient-to-br from-purple-100 to-purple-200",
-      cardBg: "bg-gradient-to-br from-purple-50 to-purple-100",
-      borderColor: "border-purple-200",
+      title: "Pending List ",
+      value: pendingCustomers.length.toString(),
+      change: `${pendingCustomers.length > 0 ? '+' + Math.round((pendingCustomers.length / Math.max(customers.length, 1)) * 100) : '0'}%`,
+      icon: Clock,
+      color: "text-white",
+      bgColor: "bg-white/20",
+      cardBg: "bg-gradient-to-br from-blue-600 to-blue-700",
+      borderColor: "border-blue-300",
+      hoverBg: "hover:bg-gradient-to-br hover:from-blue-700 hover:to-blue-800",
     },
     {
-      title: "Net Profit",
-      value: `₹${netProfit.toLocaleString()}`,
-      change: `${netProfit >= 0 ? '+' : ''}${Math.round(growthPercentage)}%`,
-      icon: netProfit >= 0 ? TrendingUp : TrendingDown,
-      color: netProfit >= 0 ? "text-emerald-600" : "text-red-600",
-      bgColor: netProfit >= 0 ? "bg-gradient-to-br from-emerald-100 to-emerald-200" : "bg-gradient-to-br from-red-100 to-red-200",
-      cardBg: netProfit >= 0 ? "bg-gradient-to-br from-emerald-50 to-emerald-100" : "bg-gradient-to-br from-red-50 to-red-100",
-      borderColor: netProfit >= 0 ? "border-emerald-200" : "border-red-200",
+      title: "Employees",
+      value: employees.length.toString(),
+      change: `+${employees.length > 3 ? Math.round((employees.length / (employees.length - 3)) * 100 - 100) : 0}%`,
+      icon: HardHat,
+      color: "text-white",
+      bgColor: "bg-white/20",
+      cardBg: "bg-gradient-to-br from-blue-600 to-blue-700",
+      borderColor: "border-blue-300",
+      hoverBg: "hover:bg-gradient-to-br hover:from-blue-700 hover:to-blue-800",
     },
   ];
 
-  const quickActions = [
-    {
-      title: "Create Bill",
-      icon: FileText,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50 hover:bg-blue-100",
-      borderColor: "border-blue-200 hover:border-blue-300",
-      route: "/billing"
-    },
-    {
-      title: "Add Customer",
-      icon: Users,
-      color: "text-green-600",
-      bgColor: "bg-green-50 hover:bg-green-100",
-      borderColor: "border-green-200 hover:border-green-300",
-      route: "/customers"
-    },
-    {
-      title: "View Transactions",
-      icon: CreditCard,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50 hover:bg-purple-100",
-      borderColor: "border-purple-200 hover:border-purple-300",
-      route: "/transactions"
-    },
-    {
-      title: "Manage Stock",
-      icon: Package,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50 hover:bg-orange-100",
-      borderColor: "border-orange-200 hover:border-orange-300",
-      route: "/stock"
-    }
+  // const quickActions = [
+    
+  // ];
+
+  // Get today's statistics
+  const todayStats = dashboardStats?.today_statistics || {};
+  const allTimeStats = dashboardStats?.all_time_statistics || {};
+
+  const firmDetails = [
+    
+    // Today's Statistics
+    { label: "--- Today's Statistics ---", value: "---", isHeader: true },
+    { label: "Total Bills", value: todayStats.total_bills || 0 },
+    { label: "Debit Bills", value: todayStats.debit_bills || 0 },
+    { label: "Credit Bills", value: todayStats.credit_bills || 0 },
+    { label: "Debit Amount", value: `₹${(todayStats.total_debit_amount || 0).toFixed(2)}` },
+    { label: "Credit Amount", value: `₹${(todayStats.total_credit_amount || 0).toFixed(2)}` },
+    
+    // Stock-wise Today's Fine
+    ...(todayStats.stock_wise_fine ? Object.entries(todayStats.stock_wise_fine).flatMap(([stock, stats]: [string, any]) => [
+      { label: `--- ${stock} ---`, value: "---", isHeader: true },
+      { label: `${stock} Debit Fine`, value: `${stats.total_debit_fine.toFixed(2)}g` },
+      { label: `${stock} Credit Fine`, value: `${stats.total_credit_fine.toFixed(2)}g` },
+    ]) : []),
+    
+    // All-time Stock Statistics
+    
   ];
 
   return (
     <>
       <AppSidebar />
       <div className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-16"}`}>
-        <Navbar />
-        <div className="p-6 space-y-6 bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 min-h-screen">
+        {/* <Navbar /> */}
+        <div className="p-6 space-y-6 bg-gradient-to-br from-blue-50 via-white to-blue-50 min-h-screen">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Dashboard
-              </h1>
-              <div className="text-lg text-gray-600 mt-2">
-                Welcome to Metalic Billing System ✨
+            <div className="flex items-center gap-4">
+              {firmSettings?.firm_logo_url && (
+                <img src={firmSettings.firm_logo_url} alt="Firm Logo" />
+              )}
+              <div>
+                <h1 className="text-3xl font-bold text-slate-800">
+                  {firmSettings?.firm_name || 'Dashboard'}
+                </h1>
+                {/* Connection Status */}
+                <div className="flex items-center gap-2 mt-1">
+                  {isOnline ? (
+                    <div className="flex items-center gap-1 text-green-600">
+                      <Wifi className="h-4 w-4" />
+                      <span className="text-sm">Online</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-red-600">
+                      <WifiOff className="h-4 w-4" />
+                      <span className="text-sm">Offline</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm text-gray-500">Today</div>
+            <div className="text-m text-gray-800">
+              {format(new Date(), 'EEEE')}
+            </div>
+
               <div className="text-lg font-semibold text-gray-800">
                 {format(new Date(), 'dd MMM yyyy')}
               </div>
@@ -145,128 +219,100 @@ const Dashboard = () => {
             {stats.map((stat, index) => (
               <Card 
                 key={index} 
-                className={`${stat.cardBg} ${stat.borderColor} border-2 hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer`}
+                className={`${stat.cardBg} ${stat.borderColor} border ${stat.hoverBg} hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer`}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-700">
+                  <CardTitle className={`text-2xl font-medium text-white`}>
                     {stat.title}
                   </CardTitle>
-                  <div className={`p-3 rounded-xl ${stat.bgColor} shadow-lg`}>
-                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
-                  <p className={`text-sm font-medium ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                    {stat.change} from last month
-                  </p>
+                  <div className={`text-xl font-bold mb-1 text-white text-slate-900`}>{stat.value}</div>
+                
                 </CardContent>
               </Card>
             ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-100 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
+            <Card className="bg-white border border-blue-200 hover:shadow-xl transition-shadow duration-300">
+              <CardHeader className="bg-gradient-to-r from-blue-100 to-blue-200 border-b border-blue-200">
+                <CardTitle className="flex items-center gap-2 text-blue-800">
                   <Clock className="h-5 w-5" />
                   Recent Bills
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {bills.slice(0, 4).map((bill) => (
-                    <div key={bill.id} className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-blue-100 hover:shadow-md transition-all duration-200">
+                    <div key={bill.id} className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg border border-slate-100">
                       <div>
-                        <div className="font-semibold text-gray-800">Bill #{bill.bill_number}</div>
-                        <div className="text-sm text-gray-600">{bill.customer_name}</div>
+                        <div className="font-medium text-slate-800">{bill.customer_name}</div>
+                        <div className="text-sm text-slate-600">{bill.item_name}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-green-600">₹{bill.total_amount.toFixed(2)}</div>
-                        <div className="text-sm text-gray-500">{format(new Date(bill.date), 'dd/MM/yyyy')}</div>
+                        <div className="font-semibold text-slate-900">₹{bill.total_amount.toFixed(2)} | {bill.total_fine.toFixed(2)}g</div>
+                        <div className="text-xs text-slate-500 flex items-center gap-2">
+                            <span>{format(new Date(bill.date), 'dd/MM/yyyy')} |</span>
+
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium
+                                ${bill.payment_type === "debit" 
+                                  ? "bg-red-100 text-red-700 border border-red-300"
+                                  : bill.payment_type === "credit"
+                                  ? "bg-green-100 text-green-700 border border-green-300"
+                                  : "bg-gray-100 text-gray-700 border border-gray-300"
+                                }`}
+                            >
+                              {bill.payment_type}
+                            </span>
+                          </div>
                       </div>
                     </div>
                   ))}
                   {bills.length === 0 && (
-                    <div className="text-center text-gray-500 py-8 bg-gray-50 rounded-lg">
-                      <FileText className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                      <p>No bills created yet</p>
+                    <div className="text-center text-slate-500 py-8 bg-slate-50 rounded-lg">
+                      <FileText className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm">No bills created yet</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-white to-purple-50 border-2 border-purple-100 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
+            <Card className="bg-white border border-blue-200 hover:shadow-xl transition-shadow duration-300">
+              <CardHeader className="bg-gradient-to-r from-blue-100 to-blue-200 border-b border-blue-200">
+                <CardTitle className="flex items-center gap-2 text-blue-800">
                   <TrendingUp className="h-5 w-5" />
-                  Quick Actions
+                  Statistics
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-2 gap-4">
-                  {quickActions.map((action, index) => (
-                    <button 
-                      key={index}
-                      onClick={() => navigate(action.route)}
-                      className={`p-4 border-2 ${action.borderColor} ${action.bgColor} rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95`}
-                    >
-                      <action.icon className={`h-8 w-8 ${action.color} mb-3 mx-auto`} />
-                      <div className="text-sm font-semibold text-gray-700">{action.title}</div>
-                    </button>
-                  ))}
-                </div>
+              <CardContent className="p-6 space-y-6">
+              
+                 
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {firmDetails.map((detail, index) => (
+                      <div key={index} className={`flex justify-between items-center text-sm ${
+                        detail.isHeader ? 'font-bold text-blue-800 bg-blue-50 p-2 rounded' : ''
+                      }`}>
+                        <span className={`font-medium text-slate-800 truncate ${detail.isHeader ? 'text-center w-full' : ''}`}>
+                          {detail.isHeader ? detail.label : `${detail.label}:`}
+                        </span>
+                        {!detail.isHeader && (
+                          <span className="font-medium text-slate-800 truncate">{detail.value}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="bg-gradient-to-br from-yellow-50 to-orange-100 border-2 border-orange-200 hover:shadow-lg transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-orange-700 flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Pending Payments
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-800">
-                  {customers.filter(c => c.balance > 0).length}
-                </div>
-                <p className="text-orange-600 text-sm">customers with pending balance</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-indigo-50 to-blue-100 border-2 border-blue-200 hover:shadow-lg transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-blue-700 flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Total Expenses
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-800">
-                  ₹{totalExpenses.toLocaleString()}
-                </div>
-                <p className="text-blue-600 text-sm">this month</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-pink-50 to-rose-100 border-2 border-rose-200 hover:shadow-lg transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-rose-700 flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Growth Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-rose-800">
-                  +{Math.abs(Math.round(growthPercentage))}%
-                </div>
-                <p className="text-rose-600 text-sm">compared to last month</p>
-              </CardContent>
-            </Card>
-          </div>
+         
         </div>
       </div>
     </>

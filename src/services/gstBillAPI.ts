@@ -13,6 +13,8 @@ export interface GSTBill {
   id?: number;
   bill_number: string;
   date: string;
+  time: string;
+  place: string;
   customer_name: string;
   customer_address: string;
   customer_gstin: string;
@@ -76,8 +78,8 @@ export const gstBillAPI = {
   },
 
   delete: async (id: number): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/gst-bills/${id}`, {
-      method: 'DELETE',
+    const response = await fetch(`${API_BASE_URL}/gst-bills/${id}/delete`, {
+      method: 'POST',
     });
     if (!response.ok) {
       throw new Error('Failed to delete GST bill');

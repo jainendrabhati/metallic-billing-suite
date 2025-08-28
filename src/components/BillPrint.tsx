@@ -1,6 +1,5 @@
-
-import React from 'react';
-import { Bill } from '@/services/api';
+import React from "react";
+import { Bill } from "@/services/api";
 
 interface BillPrintProps {
   bill: Bill;
@@ -9,24 +8,33 @@ interface BillPrintProps {
 
 const BillPrint: React.FC<BillPrintProps> = ({ bill, firmSettings }) => {
   const handlePrint = () => {
-    const printContent = document.getElementById('bill-print-content');
-    const printWindow = window.open('', '_blank');
+    if (window.printWindowOpen) {
+      return;
+    }
     
+    const printContent = document.getElementById("bill-print-content");
+    window.printWindowOpen = true;
+    const printWindow = window.open("", "_blank");
+
     if (printWindow && printContent) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Bill ${bill.bill_number}</title>
+            <title>Bill</title>
             <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+              body { font-family: Arial, sans-serif; margin: 20px; font-size: 14px; }
+              .header { text-align: center; border: 2px solid #000; padding: 15px; margin-bottom: 20px; }
               .logo { max-height: 60px; margin-bottom: 10px; }
               .bill-details { margin: 20px 0; }
-              .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-              .table th, .table td { border: 1px solid #000; padding: 8px; text-align: left; }
-              .table th { background-color: #f0f0f0; }
-              .footer { margin-top: 30px; text-align: center; }
-              .signature { margin-top: 50px; }
+              .item-table { 
+                width: 100%; 
+                border-collapse: collapse; /* no spacing between rows/columns */
+                margin: 20px 0; 
+              }
+              .item-table th, .item-table td { border: 1px solid #000; padding: 8px; text-align: center; }
+              .item-table th { background-color: #f0f0f0; font-weight: bold; }
+              .footer { margin-top: 10px; }
+              .signature { display: flex; justify-content: space-between; margin-top: 20px; }
               @media print { 
                 body { margin: 0; } 
                 .no-print { display: none; }
@@ -38,89 +46,136 @@ const BillPrint: React.FC<BillPrintProps> = ({ bill, firmSettings }) => {
           </body>
         </html>
       `);
-      
+
       printWindow.document.close();
+      printWindow.onafterprint = () => {
+        window.printWindowOpen = false;
+      };
+      printWindow.onbeforeunload = () => {
+        window.printWindowOpen = false;
+      };
       printWindow.print();
       printWindow.close();
+      } else {
+      window.printWindowOpen = false;
     }
   };
 
   return (
     <div>
-      <button 
+      {/* Print Button (hidden in print) */}
+      <button
         onClick={handlePrint}
         className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-print"
       >
         Print Bill
       </button>
-      
-      <div id="bill-print-content" className="max-w-4xl mx-auto bg-white p-8">
+
+      {/* Bill Content */}
+      <div
+        id="bill-print-content"
+        className="max-w-4xl mx-auto bg-white p-8 text-sm"
+      >
+        {/* HEADER */}
         <div className="header">
           {firmSettings?.logo_path && (
-            <img src={firmSettings.logo_path} alt="Logo" className="logo mx-auto" />
+            <img
+              src={firmSettings.logo_path}
+              alt="Logo"
+              className="logo mx-auto"
+            />
           )}
-          <h1 className="text-2xl font-bold">{firmSettings?.firm_name || 'Metalic Jewelers'}</h1>
-          <p>{firmSettings?.address}</p>
-          <p>GST No: {firmSettings?.gst_number}</p>
+          <h1 className="text-2xl font-bold">
+            {firmSettings?.firm_name || "Metalic Jewelers"}
+          </h1>
+
+          {/* Address in ONE line */}
+          {(firmSettings?.address || firmSettings?.city) && (
+            <p>
+              {firmSettings?.address}
+              {firmSettings?.city ? `, ${firmSettings.city}` : ""}
+              {firmSettings?.state ? `, ${firmSettings.state}` : ""}
+            </p>
+          )}
+
+          {firmSettings?.gst_number && <p>GST No: {firmSettings.gst_number}</p>}
+          {firmSettings?.mobile && <p>Mobile: {firmSettings.mobile}</p>}
         </div>
 
+        {/* BILL DETAILS */}
         <div className="bill-details">
-          <div className="flex justify-between mb-4">
-            <div>
-              <p><strong>Bill No:</strong> {bill.bill_number}</p>
-              <p><strong>Date:</strong> {new Date(bill.date).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p><strong>Customer:</strong> {bill.customer_name}</p>
-              <p><strong>Type:</strong> {bill.payment_type.toUpperCase()}</p>
-            </div>
-          </div>
+          <p>
+            <strong>Date:</strong>{" "}
+            {new Date(bill.date).toLocaleDateString("en-GB")}
+          </p>
+          <p>
+            <strong>Customer:</strong> {bill.customer_name}
+          </p>
+          <p>
+            <strong>Payment Type:</strong> {bill.payment_type.toUpperCase()}
+          </p>
+        </div>
 
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Weight (g)</th>
-                <th>Tunch</th>
-                <th>Wastage</th>
-                <th>Wages</th>
-                <th>Total Fine (g)</th>
-                {bill.payment_type === 'credit' && <th>Silver Amount</th>}
-                <th>Total Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>{bill.item}</td>
-                <td>{bill.weight.toFixed(2)}</td>
-                <td>{bill.tunch.toFixed(2)}</td>
-                <td>{bill.wastage.toFixed(2)}</td>
-                <td>{bill.wages.toFixed(2)}</td>
-                 <td>{bill.total_fine.toFixed(2)}</td>
-                {bill.payment_type === 'credit' && <td>₹{bill.silver_amount.toFixed(2)}</td>}
-                <td>₹{bill.total_amount.toFixed(2)}</td>
-              </tr>
-            </tbody>
-          </table>
+        {/* ITEM TABLE */}
+        <div className="item-details">
+          <table
+  className="item-table"
+  style={{
+    width: "100%",
+    borderCollapse: "separate",
+    borderSpacing: "3px 0", // 3px horizontal gap, no vertical gap
+    margin: "20px 0",
+  }}
+>
+  <thead>
+    <tr>
+      <th className="text-center">Item Name</th>
+      <th className="text-center">Item Type</th>
+      <th className="text-center">Weight</th>
+      <th className="text-center">Tunch</th>
+      <th className="text-center">Wastage</th>
+      <th className="text-center">Wages</th>
+      <th className="text-center">Fine</th>
+      <th className="text-center">External Amount</th>
+      <th className="text-center">Total Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td className="text-center">{bill.item_name}</td>
+      <td className="text-center">{bill.item}</td>
+      <td className="text-center">{bill.weight?.toFixed(2)}</td>
+      <td className="text-center">{bill.tunch?.toFixed(2)}</td>
+      <td className="text-center">{bill.wastage?.toFixed(2)}</td>
+      <td className="text-center">{bill.wages?.toFixed(2)}</td>
+      <td className="text-center">{bill.total_fine?.toFixed(2)}g</td>
+      <td className="text-center">{bill.silver_amount?.toFixed(2)}</td>
+      <td className="text-center">₹{bill.total_amount?.toFixed(2)}</td>
+    </tr>
+  </tbody>
+</table>
 
+
+          {/* DESCRIPTION */}
           {bill.description && (
-            <div className="mt-4">
-              <p><strong>Description:</strong> {bill.description}</p>
+            <div className="mt-2">
+              <p>
+                <strong>Description:</strong> {bill.description}
+              </p>
             </div>
           )}
         </div>
 
+        {/* SIGNATURES */}
         <div className="footer">
           <div className="signature">
-            <div className="flex justify-between mt-16">
-              <div>
-                <p>_________________</p>
-                <p>Customer Signature</p>
-              </div>
-              <div>
-                <p>_________________</p>
-                <p>Authorized Signature</p>
-              </div>
+            <div className="text-left">
+              <p>_________________</p>
+              <p>Customer Signature</p>
+            </div>
+            <div className="text-right">
+              <p>_________________</p>
+              <p>Authorized Signature</p>
             </div>
           </div>
         </div>

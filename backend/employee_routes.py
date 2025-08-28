@@ -8,12 +8,12 @@ employee_bp = Blueprint('employee', __name__)
 def create_employee():
     try:
         data = request.get_json()
-        print(data)
+        
         employee = Employee.create(
             name=data['name'], 
             position=data['position'],
         )
-        print(employee.to_dict())
+        
         db.session.commit()
         return jsonify(employee.to_dict()), 201
     except Exception as e:
@@ -56,7 +56,7 @@ def update_employee(employee_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@employee_bp.route('/employees/<int:employee_id>', methods=['DELETE'])
+@employee_bp.route('/employees/<int:employee_id>/delete', methods=['POST'])
 def delete_employee(employee_id):
     try:
         employee = Employee.get_by_id(employee_id)
@@ -73,32 +73,56 @@ def delete_employee(employee_id):
 # Employee Salary APIs
 @employee_bp.route('/employee-salaries', methods=['POST'])
 def create_employee_salary():
+
+    db.session.begin()
     try:
         data = request.get_json()
-        print(data)
+        
+        
+        # Handle employee creation if new employee
+        employee_id = data.get('employee_id')
+        if not employee_id:
+            # Create new employee if employee_id is not provided
+            employee_name = data.get('employee_name', '').strip()
+            employee_position = data.get('employee_position', '').strip()
+            
+            if not employee_name or not employee_position:
+                raise ValueError("Employee name and position are required for new employee")
+            
+            # Check for duplicate employee name
+            existing_employee = Employee.query.filter_by(name=employee_name).first()
+            if existing_employee:
+                employee_id = existing_employee.id
+            else:
+                # Create new employee
+                new_employee = Employee(name=employee_name, position=employee_position)
+                db.session.add(new_employee)
+                db.session.flush()  # Get the ID without committing
+                employee_id = new_employee.id
+        
+        # Validate required fields for salary
+        required_fields = ['month', 'year', 'monthly_salary', 'present_days', 'total_days']
+        for field in required_fields:
+            if field not in data or data[field] is None:
+                raise ValueError(f"{field} is required")
         salary = EmployeeSalary.create(
-            data['employee_id'],
+            employee_id,
             data['month'],
             data['year'],
             data['monthly_salary'],
             data['present_days'],
             data['total_days']
         )
-        print(salary.to_dict())
         
-        # Create expense record for salary
-        employee = Employee.get_by_id(data['employee_id'])
-        # expense = Expense.create(
-        #     description=f"Employee Salary for {employee.name if employee else 'Unknown Employee'} - {data['month']}/{data['year']}",
-        #     amount=salary.calculated_salary,
-        #     category="Salary",
-        #     date=salary.created_at.date()
-        # )
-        
+        db.session.commit()
         return jsonify(salary.to_dict()), 201
+    except ValueError as ve:
+        db.session.rollback()
+        return jsonify({'error': str(ve)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Failed to create salary: {str(e)}'}), 500
+
 
 @employee_bp.route('/employee-salaries', methods=['GET'])
 def get_employee_salaries():
@@ -139,7 +163,7 @@ def update_employee_salary(salary_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@employee_bp.route('/employee-salaries/<int:salary_id>', methods=['DELETE'])
+@employee_bp.route('/employee-salaries/<int:salary_id>/delete', methods=['POST'])
 def delete_employee_salary(salary_id):
     try:
         salary = EmployeeSalary.get_by_id(salary_id)
@@ -174,7 +198,7 @@ def create_employee_payment():
 
             'date': data['payment_date'] if 'payment_date' in data else datetime.utcnow().date()
         }
-        print(expense_data)
+        
         Expense.create(**expense_data)
 
         return jsonify(payment.to_dict()), 201
@@ -198,16 +222,25 @@ def get_employee_payments_by_employee(employee_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@employee_bp.route('/employee-payments/<int:payment_id>', methods=['DELETE'])
+@employee_bp.route('/employee-payments/<int:payment_id>/delete', methods=['POST'])
 def delete_employee_payment(payment_id):
     try:
         payment = EmployeePayment.query.get(payment_id)
         if not payment:
             return jsonify({'error': 'Payment not found'}), 404
         
+        # Create an expense entry to deduct the deleted payment amount
+        expense = Expense(
+            description=f"Deducted payment for Employee ID {payment.employee_id} - {payment.description}",
+            amount=-payment.amount,  # Negative amount to deduct
+            date=payment.payment_date,
+            category="Employee Payment Reversal"
+        )
+        db.session.add(expense)
+        
         db.session.delete(payment)
         db.session.commit()
-        return jsonify({'message': 'Payment deleted successfully'}), 200
+        return jsonify({'message': 'Payment deleted successfully and expense deducted'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

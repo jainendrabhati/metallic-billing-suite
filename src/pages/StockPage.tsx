@@ -15,7 +15,18 @@ import { useToast } from "@/hooks/use-toast";
 import AppSidebar from "@/components/AppSidebar";
 import { useSidebar } from "@/components/SidebarProvider";
 import Navbar from "@/components/Navbar";
-import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { format, addMinutes } from "date-fns";
 
 const StockPage = () => {
   const { isOpen } = useSidebar();
@@ -365,14 +376,50 @@ const StockPage = () => {
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
-                          <Button
+                           <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setSelectedItem(item)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Bill</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete{" "}
+                                    <span className="font-semibold">
+                                      {item.item_name}
+                                    </span>
+                                    ? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => {
+                                      if (selectedItem) {
+                                        deleteItemMutation.mutate(item.id);
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          {/* <Button
                             variant="outline"
                             size="sm"
                             onClick={() => deleteItemMutation.mutate(item.id)}
                             className="border-red-300 text-red-600 hover:bg-red-50"
                           >
                             <Trash2 className="h-3 w-3" />
-                          </Button>
+                          </Button> */}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -464,7 +511,8 @@ const StockPage = () => {
                       className="hover:bg-slate-50 border-b border-slate-100"
                     >
                       <TableCell className="text-slate-700">
-                        {format(new Date(stock.created_at), 'dd/MM/yyyy HH:mm')}
+                        {format(addMinutes(new Date(stock.created_at), 330), 'dd/MM/yyyy HH:mm')}
+                        
                       </TableCell>
                       <TableCell className="font-medium text-slate-900">
                         {stock.item_name}

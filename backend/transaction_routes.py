@@ -110,7 +110,7 @@ def update_transaction(transaction_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@transaction_bp.route('/transactions/<int:transaction_id>', methods=['DELETE'])
+@transaction_bp.route('/transactions/<int:transaction_id>/delete', methods=['POST'])
 def delete_transaction(transaction_id):
     try:
         transaction = Transaction.get_by_id(transaction_id)

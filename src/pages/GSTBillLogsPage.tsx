@@ -6,27 +6,38 @@ import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Search, Calendar as CalendarIcon, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Search, Calendar as CalendarIcon, Download, FileSpreadsheet, FileText, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { gstBillAPI, GSTBill } from "@/services/gstBillAPI";
 import AppSidebar from "@/components/AppSidebar";
 import { useSidebar } from "@/components/SidebarProvider";
 import Navbar from "@/components/Navbar";
+import { generatePDFHeader, generateBankDetailsSection } from "@/components/PDFTemplateHeader";
+import { settingsAPI } from "@/services/api";
+import GSTBillEditDialog from "@/components/GSTBillEditDialog";
 
 const GSTBillLogsPage = () => {
   const { isOpen } = useSidebar();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedBill, setSelectedBill] = useState<GSTBill | null>(null);
 
   const { data: gstBills = [], isLoading } = useQuery({
     queryKey: ['gst-bills'],
     queryFn: gstBillAPI.getAll,
+  });
+
+  const { data: firmSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsAPI.getFirmSettings(),
   });
 
   const filteredBills = gstBills.filter(bill => {
@@ -39,6 +50,35 @@ const GSTBillLogsPage = () => {
     
     return matchesSearch && matchesStartDate && matchesEndDate;
   });
+
+   const deleteGSTBillMutation = useMutation({
+    mutationFn: gstBillAPI.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gst-bills'] });
+      toast({
+        title: "Success",
+        description: "GST bill deleted successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete GST bill.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteBill = (id: number) => {
+    if (window.confirm("Are you sure you want to delete this GST bill?")) {
+      deleteGSTBillMutation.mutate(id);
+    }
+  };
+
+  const handleEditBill = (bill: GSTBill) => {
+    setSelectedBill(bill);
+    setEditDialogOpen(true);
+  };
 
   const handleExportToExcel = async () => {
     try {
@@ -53,7 +93,7 @@ const GSTBillLogsPage = () => {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `gst-bills-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      a.download = `gst-bills-${format(new Date(), 'dd-MM-yyyy')}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -73,9 +113,9 @@ const GSTBillLogsPage = () => {
 
   const generateBillPDF = (bill: GSTBill) => {
     const printContent = `
-      <html>
+     <html>
         <head>
-          <title>GST Tax Invoice - ${bill.bill_number}</title>
+          <title>.</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
             .header { text-align: center; border: 2px solid #000; padding: 15px; margin-bottom: 20px; }
@@ -89,27 +129,26 @@ const GSTBillLogsPage = () => {
           </style>
         </head>
         <body>
-          <div class="header">
-            <h2>TOLARAM & SONS</h2>
-            <p><strong>SILVER ART & CRAFT</strong></p>
-            <p>Plot No. 120, Shree Dev Nagar, Benad Road, Jaipur (Raj.) -302039</p>
-            <p>Email: tolaramkumar0403@gmail.com | State Code: 08</p>
-            <p><strong>GSTIN:</strong> 08BGHPP0571K1Z3 | <strong>PAN:</strong> BGHPP0571K</p>
-            <div style="float: right; margin-top: -60px;">
-              <strong>TAX INVOICE</strong><br>
-              Mob.: 7339696995<br>
-              9521474939
-            </div>
-          </div>
+          
+             ${generatePDFHeader({ firmSettings, title: "BILL RECEIPT" })}
+          
 
           <div class="invoice-details">
             <div style="width: 50%;">
-              <strong>Invoice No.:</strong> ${bill.bill_number}<br>
-              <strong>Date:</strong> ${format(new Date(bill.date), 'dd/MM/yyyy')}<br><br>
+             
+              <strong>Date:</strong> ${format(new Date(bill.date), 'dd/MM/yyyy')}<br>
+              <strong>Time:</strong> ${bill.time}<br>
+              <strong>Place of Delivery:</strong> ${bill.place}<br><br>
               <strong>To,</strong><br>
               M/s ${bill.customer_name}<br>
               ${bill.customer_address}<br>
               <strong>GSTIN No.:</strong> ${bill.customer_gstin}
+            </div>
+            <div style="width: 45%; text-align: right;">
+              <strong>Your Order No.:</strong> _________________ <strong>Date:</strong> _______<br>
+              <strong>R.R./G.R. No.:</strong> _________________ <strong>Date:</strong> _______<br>
+              <strong>Vehicle No.:</strong> _________________________________<br>
+             
             </div>
           </div>
 
@@ -122,7 +161,7 @@ const GSTBillLogsPage = () => {
                 <th width="10%">Weight</th>
                 <th width="10%">Rate</th>
                 <th width="15%">Amount</th>
-                <th width="10%">P</th>
+                
               </tr>
             </thead>
             <tbody>
@@ -134,7 +173,18 @@ const GSTBillLogsPage = () => {
                   <td style="text-align: center;">${item.weight}</td>
                   <td style="text-align: right;">₹${item.rate.toFixed(2)}</td>
                   <td style="text-align: right;">₹${item.amount.toFixed(2)}</td>
-                  <td></td>
+                  
+                </tr>
+              `).join('')}
+              ${Array.from({ length: Math.max(0, 8 - bill.items.length) }, (_, i) => `
+                <tr>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                 
                 </tr>
               `).join('')}
             </tbody>
@@ -144,10 +194,10 @@ const GSTBillLogsPage = () => {
             <table style="width: 100%; margin-top: 20px;">
               <tr>
                 <td style="width: 50%; vertical-align: top;">
-                  <strong>Bank Name:</strong> STATE BANK OF INDIA<br>
-                  <strong>Branch:</strong> Benad Road, Jaipur<br>
-                  <strong>A/c No.:</strong> 61338285502<br>
-                  <strong>IFSC Code:</strong> SBIN0032380<br><br>
+                  <strong>Bank Name:</strong> ${firmSettings?.account_holder_name || 'STATE BANK OF INDIA'}<br>
+                  <strong>Branch:</strong> ${firmSettings?.branch_address || 'Benad Road, Jaipur'}<br>
+                  <strong>A/c Name & Number:</strong> ${firmSettings?.account_number || '61338285502'}<br>
+                  <strong>IFSC Code:</strong> ${firmSettings?.ifsc_code || 'SBIN0032380'}<br><br>
                   <strong>Rs. in words:</strong> ${bill.amount_in_words}
                 </td>
                 <td style="width: 50%; vertical-align: top;">
@@ -180,9 +230,10 @@ const GSTBillLogsPage = () => {
 
           <div class="footer" style="margin-top: 50px;">
             <div style="float: right; text-align: center;">
-              <strong>For: TOLARAM & SONS</strong><br><br><br>
+              <strong>For: ${firmSettings?.firm_name || 'TOLARAM & SONS'}</strong><br><br><br>
               <strong>Prop./Manager</strong>
             </div>
+           
           </div>
         </body>
       </html>
@@ -358,7 +409,17 @@ const GSTBillLogsPage = () => {
                             <div className="font-bold text-green-600">₹{bill.grand_total.toFixed(2)}</div>
                             <div className="text-xs text-gray-500">Grand Total</div>
                           </div>
+                           
                           <div className="flex justify-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditBill(bill)}
+                              className="flex items-center gap-1"
+                            >
+                              <Edit className="h-3 w-3" />
+                              Edit
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
@@ -367,6 +428,15 @@ const GSTBillLogsPage = () => {
                             >
                               <Download className="h-3 w-3" />
                               PDF
+                            </Button>
+                             <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteBill(bill.id!)}
+                              className="flex items-center gap-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
                             </Button>
                           </div>
                         </div>
@@ -379,6 +449,11 @@ const GSTBillLogsPage = () => {
           </div>
         </div>
       </div>
+       <GSTBillEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        bill={selectedBill}
+      />
     </>
   );
 };

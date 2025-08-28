@@ -10,7 +10,32 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, StockItem, Stock, FirmSettings, EmployeeSalary
-from app import app
+
+
+import uuid
+
+
+def save_uploaded_file(file, subfolder=''):
+    """Save uploaded file and return the URL"""
+    try:
+        # Create uploads directory if it doesn't exist
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+        if subfolder:
+            upload_folder = os.path.join(upload_folder, subfolder)
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        # Generate unique filename
+        filename = str(uuid.uuid4()) + '_' + file.filename
+        filepath = os.path.join(upload_folder, filename)
+        
+        # Save the file
+        file.save(filepath)
+        
+        # Return relative URL path
+        return f"/uploads/{subfolder}/{filename}" if subfolder else f"/uploads/{filename}"
+    except Exception as e:
+        print(f"Error saving file: {e}")
+        return None
 
 def export_to_csv(data, data_type):
     """Export data to CSV format"""
@@ -202,19 +227,19 @@ def export_to_pdf(data, data_type):
 
 def backup_database():
     """Create a backup of the entire database as CSV files in a ZIP"""
-    with app.app_context():  # Ensure Flask app context is active during scheduled tasks
+    with current_app.app_context():  # Ensure Flask app context is active during scheduled tasks
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        zip_filename = f"metalic_backup_{timestamp}.zip"
+        timestamp = datetime.now().strftime("%H-%M-%S_%d-%m-%Y")
+        zip_filename = f"Silvertally_Backup_{timestamp}.zip"
         upload_folder = current_app.config.get('UPLOAD_FOLDER', 'backups')
         os.makedirs(upload_folder, exist_ok=True)
         zip_filepath = os.path.join(upload_folder, zip_filename)
 
-        print(f"Creating backup ZIP at: {zip_filepath}")
+        
 
         # Create a temporary directory for CSV files
         with tempfile.TemporaryDirectory() as temp_dir:
-            print(f"Using temp directory: {temp_dir}")
+           
 
             # Export each model to CSV
             models_data = {
@@ -237,7 +262,7 @@ def backup_database():
                 csv_filepath = os.path.join(temp_dir, csv_filename)
                 csv_files.append((csv_filepath, csv_filename))
 
-                print(f"Creating CSV for {model_name} with {len(data)} records")
+                
 
                 with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
                     fieldnames = get_model_database_fields(model_name)
@@ -258,15 +283,15 @@ def backup_database():
 
                         writer.writerow(filtered_dict)
 
-            print(f"Creating ZIP file with {len(csv_files)} CSV files")
+            
 
             with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for csv_filepath, csv_filename in csv_files:
                     if os.path.exists(csv_filepath):
                         zipf.write(csv_filepath, csv_filename)
-                        print(f"Added {csv_filename} to ZIP")
+                        
 
-        print(f"Backup created successfully: {zip_filename}")
+        
         return zip_filename
 
 
@@ -282,7 +307,7 @@ def get_model_database_fields(model_name):
         'employee_payments': ['id', 'employee_id', 'amount', 'payment_date', 'description', 'created_at', 'updated_at'],
         'stock_items': ['id', 'item_name', 'current_weight', 'description', 'created_at', 'updated_at'],
         'stock': ['id', 'item_name', 'amount', 'transaction_type', 'description', 'created_at'],
-        'firm_settings': ['id', 'firm_name', 'gst_number', 'address', 'logo_path', 'created_at', 'updated_at']
+        'firm_settings': ['id', 'firm_name', 'gst_number', 'address', 'firm_logo_url', 'created_at', 'updated_at']
     }
     return fields_map.get(model_name, [])
 
@@ -335,7 +360,7 @@ def restore_database(zip_file_path):
                 
                 # Skip if CSV file doesn't exist
                 if not os.path.exists(csv_filepath):
-                    print(f"Warning: {csv_filename} not found in backup, skipping...")
+                    
                     continue
                 
                 try:
@@ -379,11 +404,11 @@ def restore_database(zip_file_path):
                                     instance = model_class(**data)
                                     db.session.add(instance)
                                 except Exception as e:
-                                    print(f"Error creating {model_class.__name__} instance: {str(e)}")
+                                    
                                     continue
                 
                 except Exception as e:
-                    print(f"Warning: Error processing {csv_filename}: {str(e)}")
+                   
                     continue
             
             db.session.commit()

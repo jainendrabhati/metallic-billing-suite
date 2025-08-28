@@ -1,3 +1,4 @@
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 
@@ -12,6 +13,7 @@ export interface Customer {
 }
 
 export interface Bill {
+  item_name: string;
   id: number;
   bill_number: string;
   customer_name: string;
@@ -172,8 +174,8 @@ export const customerAPI = {
   },
 
   delete: async (id: number) => {
-    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/customers/${id}/delete`, {
+      method: "POST",
     });
     if (!response.ok) {
       throw new Error("Failed to delete customer");
@@ -220,8 +222,8 @@ export const billAPI = {
   },
 
   delete: async (id: number) => {
-    const response = await fetch(`${API_BASE_URL}/bills/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/bills/${id}/delete`, {
+      method: "POST",
     });
     if (!response.ok) {
       throw new Error("Failed to delete bill");
@@ -281,8 +283,8 @@ export const transactionAPI = {
   },
 
   delete: async (id: number) => {
-    const response = await fetch(`${API_BASE_URL}/transactions/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/transactions/${id}/delete`, {
+      method: "POST",
     });
     if (!response.ok) {
       throw new Error("Failed to delete transaction");
@@ -390,8 +392,8 @@ export const employeeAPI = {
   },
 
   delete: async (id: number) => {
-    const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/employees/${id}/delete`, {
+      method: "POST",
     });
     if (!response.ok) {
       throw new Error("Failed to delete employee");
@@ -430,6 +432,16 @@ export const employeePaymentAPI = {
     }
     return response.json();
   },
+
+  delete: async (id: number) => {
+    const response = await fetch(`${API_BASE_URL}/employee-payments/${id}/delete`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete employee payment");
+    }
+    return response.json();
+  },
 };
 
 export const employeeSalaryAPI = {
@@ -459,6 +471,30 @@ export const employeeSalaryAPI = {
     });
     if (!response.ok) {
       throw new Error("Failed to create employee salary");
+    }
+    return response.json();
+  },
+
+  update: async (id: number, salaryData: any) => {
+    const response = await fetch(`${API_BASE_URL}/employee-salaries/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(salaryData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to update employee salary");
+    }
+    return response.json();
+  },
+
+  delete: async (id: number) => {
+    const response = await fetch(`${API_BASE_URL}/employee-salaries/${id}/delete`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete employee salary");
     }
     return response.json();
   },
@@ -537,8 +573,8 @@ export const stockAPI = {
   },
 
   delete: async (id: number) => {
-    const response = await fetch(`${API_BASE_URL}/stock/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/stock/${id}/delete`, {
+      method: "POST",
     });
     if (!response.ok) {
       throw new Error("Failed to delete stock");
@@ -585,8 +621,8 @@ export const stockItemAPI = {
   },
 
   delete: async (id: number) => {
-    const response = await fetch(`${API_BASE_URL}/stock-items/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/stock-items/${id}/delete`, {
+      method: "POST",
     });
     if (!response.ok) {
       throw new Error("Failed to delete stock item");
@@ -647,8 +683,8 @@ export const expenseAPI = {
   },
 
   delete: async (id: number) => {
-    const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/expenses/${id}/delete`, {
+      method: "POST",
     });
     if (!response.ok) {
       throw new Error("Failed to delete expense");
@@ -663,25 +699,50 @@ export const settingsAPI = {
     if (!response.ok) {
       throw new Error("Failed to fetch firm settings");
     }
-    return response.json();
+
+    const data = await response.json();
+
+    // ✅ Ensure firm_logo_url is always absolute
+    if (data.firm_logo_url && !data.firm_logo_url.startsWith("http")) {
+      data.firm_logo_url = `http://localhost:5000/${data.firm_logo_url}`;
+    }
+
+    return data;
   },
 
   updateFirmSettings: async (settingsData: any) => {
-    
+    console.log("Updating firm settings with data:", settingsData);
+
+    const isFormData = settingsData instanceof FormData;
+
     const response = await fetch(`${API_BASE_URL}/settings`, {
-      
       method: "PUT",
-      // headers: {
-      //   "Content-Type": "application/json",
-      // },
-      
-      body: settingsData,
+      headers: isFormData ? undefined : { "Content-Type": "application/json" },
+      body: isFormData ? settingsData : JSON.stringify(settingsData),
     });
-    
+
     if (!response.ok) {
-      throw new Error("Failed to update firm settings");
+      let errorMessage = "Failed to update firm settings";
+      try {
+        const errorData = await response.json();
+        if (errorData?.message) {
+          errorMessage = errorData.message;
+        }
+      } catch {
+        const text = await response.text();
+        if (text) errorMessage = text;
+      }
+      throw new Error(errorMessage);
     }
-    return response.json();
+
+    const data = await response.json();
+
+    // ✅ Fix logo URL after update too
+    if (data.firm_logo_url && !data.firm_logo_url.startsWith("http")) {
+      data.firm_logo_url = `${API_BASE_URL}${data.firm_logo_url}`;
+    }
+
+    return data;
   },
 
   getGoogleDriveSettings: async () => {
@@ -724,21 +785,28 @@ export const settingsAPI = {
   downloadBackup: async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/backup/download`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to download backup');
+        throw new Error(errorData.error || "Failed to download backup");
       }
 
-      // Get the filename from the Content-Disposition header or create a default
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'metalic_backup.zip';
-      
+      const contentDisposition = response.headers.get("Content-Disposition");
+
+      // ✅ Generate timestamp in format HH-MM-SS_DD-MM-YYYY
+      const now = new Date();
+      const timestamp = now.toLocaleTimeString("en-GB", { hour12: false }).replace(/:/g, "-") 
+                      + "_" 
+                      + now.toLocaleDateString("en-GB").replace(/\//g, "-");
+
+      // ✅ Use in filename
+      let filename = `metalic_backup_${timestamp}.zip`;
+
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
         if (filenameMatch) {
@@ -746,24 +814,20 @@ export const settingsAPI = {
         }
       }
 
-      // Convert response to blob
       const blob = await response.blob();
-      
-      // Create download link
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
+
       window.URL.revokeObjectURL(url);
       document.body.removeChild(link);
-      
+
       return { success: true, filename };
     } catch (error) {
-      console.error('Download backup error:', error);
+      console.error("Download backup error:", error);
       throw error;
     }
   },
@@ -771,21 +835,21 @@ export const settingsAPI = {
   uploadBackup: async (file: File) => {
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
       const response = await fetch(`${API_BASE_URL}/backup/upload`, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload backup');
+        throw new Error(errorData.error || "Failed to upload backup");
       }
 
       return response.json();
     } catch (error: any) {
-      console.error('Upload backup error:', error);
+      console.error("Upload backup error:", error);
       throw error;
     }
   },

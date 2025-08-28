@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar as CalendarIcon, CreditCard, Edit, TrendingUp, DollarSign, Scale } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, CreditCard, Edit, TrendingUp, MinusCircle, Scale,TrendingDown, IndianRupee } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +40,13 @@ const ExpensesPage = () => {
   // Fetch expenses with date filter applied on backend
   const { data: expensesResponse } = useQuery({
     queryKey: ['expenses', fromDate, toDate],
-    queryFn: () => expenseAPI.getAll(fromDate || undefined, toDate || undefined),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (fromDate) params.append('from_date', fromDate);
+      if (toDate) params.append('to_date', toDate);
+      return fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/expenses?${params.toString()}`)
+        .then(res => res.json());
+    },
   });
 
   // Mutations
@@ -110,7 +116,7 @@ const ExpensesPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!description || !amount || !category || !date) {
+    if (!description || !amount  || !date) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -194,22 +200,7 @@ const ExpensesPage = () => {
                             className="border-slate-300"
                           />
                         </div>
-                        <div>
-                          <Label htmlFor="category" className="text-slate-700">Category *</Label>
-                          <Select value={category} onValueChange={setCategory}>
-                            <SelectTrigger className="border-slate-300">
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Fixed">Fixed</SelectItem>
-                              <SelectItem value="Variable">Variable</SelectItem>
-                              <SelectItem value="Capital">Capital</SelectItem>
-                              <SelectItem value="Operational">Operational</SelectItem>
-                              <SelectItem value="Employee Salary">Employee Salary</SelectItem>
-                              <SelectItem value="Other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -330,39 +321,38 @@ const ExpensesPage = () => {
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg bg-gradient-to-r from-green-500 to-green-600 text-white">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100">Net Fine Balance</p>
-                      <p className="text-2xl font-bold">{dashboardData?.net_fine?.toFixed(2) || 0}g</p>
-                      <p className="text-xs text-green-200">Credit Fine - Debit Weight×Tunch</p>
-                    </div>
-                    <Scale className="h-8 w-8 text-green-200" />
-                  </div>
-                </CardContent>
-              </Card>
-
               <Card className="border-0 shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-blue-100">Total Bill Amount</p>
+                      <p className="text-blue-100">Total Bill Amount (Debit)</p>
                       <p className="text-2xl font-bold">₹{dashboardData?.total_bill_amount?.toLocaleString() || 0}</p>
                     </div>
-                    <DollarSign className="h-8 w-8 text-blue-200" />
+                    <TrendingDown className="h-8 w-8 text-blue-200" />
+                    
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-green-500 to-green-600 text-white">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-purple-100">Total Revenue</p>
-                      <p className="text-2xl font-bold">₹{dashboardData?.total_silver_amount?.toLocaleString() || 0}</p>
+                      <p className="text-green-100">Total Revenue (Credit)</p>
+                      <p className="text-2xl font-bold">₹{dashboardData?.total_revenue?.toLocaleString() || 0}</p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-purple-200" />
+                    <TrendingUp className="h-8 w-8 text-green-200" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-yellow-100">Total Balance</p>
+                      <p className="text-2xl font-bold"> ₹{dashboardData?.balance_sheet?.rupee_balance?.toLocaleString() || 0}</p>
+                    </div>
+                    <IndianRupee className="h-8 w-8 text-yellow-200" />
                   </div>
                 </CardContent>
               </Card>
@@ -377,62 +367,63 @@ const ExpensesPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Net Fine for each stock item */}
                   {dashboardData?.net_fine_by_item && Object.entries(dashboardData.net_fine_by_item).map(([itemName, netFine]) => (
-                    <div key={itemName} className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200">
-                      <h3 className="text-lg font-semibold text-purple-800 mb-2">{itemName}</h3>
-                      <p className="text-2xl font-bold text-purple-600">
-                        {Number(netFine).toFixed(2)} grams
-                      </p>
-                      <p className="text-sm text-purple-700 mt-2">Net Fine (Credit - Debit)</p>
-                    </div>
+                    <div
+                        key={itemName}
+                        className=" p-6 rounded-lg border border-blue-200"
+                      >
+                        <h3 className="text-lg font-semibold text-blue-800 mb-2">{itemName}</h3>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {Number(netFine).toFixed(2)} grams
+                        </p>
+
+                        {/* Bottom section with Credit & Debit */}
+                        <div className="flex justify-between mt-2">
+                          <div className="flex-1 mr-2 bg-green-50 border border-green-200 rounded-lg p-2 text-center">
+                            <h4 className="text-xs font-medium text-green-700">Credit</h4>
+                            <p className="text-md font-semibold text-green-700">
+                              {Number(dashboardData?.credit_fine_by_item?.[itemName] || 0).toFixed(2)} g
+                            </p>
+                          </div>
+                          <div className="flex-1 ml-2 bg-red-50 border border-red-200 rounded-lg p-2 text-center">
+                            <h4 className="text-xs font-medium text-red-700">Debit</h4>
+                            <p className="text-md font-semibold text-red-700">
+                              {Number(dashboardData?.debit_fine_by_item?.[itemName] || 0).toFixed(2)} g
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                   ))}
                   
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
-                    <h3 className="text-lg font-semibold text-blue-800 mb-2">Rupee Balance</h3>
-                    <p className="text-3xl font-bold text-blue-600">
-                      ₹{dashboardData?.balance_sheet?.rupee_balance?.toLocaleString() || 0}
-                    </p>
-                    <p className="text-sm text-blue-700 mt-2">Revenue - Expenses</p>
-                  </div>
+                 
                 </div>
               </CardContent>
             </Card>
 
             {/* Recent Expenses */}
-            <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-slate-50 border-b border-slate-200 rounded-t-lg">
-                <CardTitle className="text-lg font-semibold text-slate-800">Recent Expenses Log</CardTitle>
+             <Card className="border-0 bg-card" style={{ boxShadow: "var(--shadow-card)" }}>
+              <CardHeader className="bg-secondary border-b border-border rounded-t-lg">
+                <CardTitle className="text-lg font-semibold text-foreground">Recent Expenses Log</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50">
-                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Description</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Amount</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Category</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Date</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Status</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Actions</th>
+                       <tr className="border-b border-border bg-secondary">
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">Description</th>
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">Amount</th>
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">Date</th>
+                        
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {expenses.map((expense: Expense) => (
-                        <tr key={expense.id} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="py-3 px-4 font-medium text-slate-900">{expense.description}</td>
+                        <tr key={expense.id} className="border-b border-slate-200 hover:bg-slate-50">
+                          <td className="py-3 px-4 text-sm text-slate-900">{expense.description}</td>
                           <td className="py-3 px-4 font-semibold text-slate-900">₹{expense.amount.toLocaleString()}</td>
-                          <td className="py-3 px-4 text-slate-700">{expense.category}</td>
-                          <td className="py-3 px-4 text-slate-700">{format(new Date(expense.date), 'dd/MM/yyyy')}</td>
-                          <td className="py-3 px-4">
-                            <Badge 
-                              variant={expense.status === 'paid' ? 'default' : 'secondary'}
-                              className={expense.status === 'paid' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-orange-100 text-orange-800'
-                              }
-                            >
-                              {expense.status}
-                            </Badge>
-                          </td>
+                         
+                          <td className="py-3 px-4 text-sm text-slate-700">{format(new Date(expense.date), 'dd/MM/yyyy')}</td>
+                          
                           <td className="py-3 px-4">
                             <Button 
                               variant="outline" 

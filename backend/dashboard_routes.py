@@ -1,12 +1,15 @@
-
 from flask import Blueprint, request, jsonify, send_file, current_app
-
 from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, Settings, GoogleDriveSettings
-
 from utils import backup_database, restore_database
 from google_drive_service import google_drive_service, schedule_backup, setup_backup_scheduler
+from offline_support import setup_offline_support, get_offline_dashboard, offline_db
 import os
 from werkzeug.utils import secure_filename
+from scheduler import scheduler
+from flask import current_app
+from google_drive_service import schedule_backup
+
+
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -25,41 +28,65 @@ def get_settings():
 @dashboard_bp.route('/settings', methods=['PUT'])
 def update_settings():
     try:
-        form = request.form
-        files = request.files
+        data = {}
+        firm_logo_filename = None
 
-        # Read form fields
-        firm_name = form.get('firm_name')
-        gst_number = form.get('gst_number')
-        address = form.get('address')
-        city = form.get('city')
-        account_number = form.get('account_number')
-        account_holder_name = form.get('account_holder_name')
-        ifsc_code = form.get('ifsc_code')
-        branch_address = form.get('branch_address')
+        # Handle multipart/form-data
+        if request.content_type and "multipart/form-data" in request.content_type:
+            form = request.form
+            files = request.files
 
-        # Handle file upload (firm logo)
-        firm_logo = files.get('firm_logo')
-        if firm_logo:
-            firm_logo.save(f"static/uploads/{firm_logo.filename}")  # or handle it your way
+            data = {
+                "firm_name": form.get("firm_name"),
+                "gst_number": form.get("gst_number"),
+                "address": form.get("address"),
+                "city": form.get("city"),
+                "mobile": form.get("mobile"),
+                "email": form.get("email"),
+                "account_number": form.get("account_number"),
+                "account_holder_name": form.get("account_holder_name"),
+                "ifsc_code": form.get("ifsc_code"),
+                "branch_address": form.get("branch_address"),
+            }
 
-        # Update your model
-        settings = Settings.update_settings(
-            firm_name=firm_name,
-            gst_number=gst_number,
-            address=address,
-            city=city,
-            account_number=account_number,
-            account_holder_name=account_holder_name,
-            ifsc_code=ifsc_code,
-            branch_address=branch_address,
-            firm_logo_filename=firm_logo.filename if firm_logo else None
-        )
+            # Handle file upload
+            firm_logo = files.get("firm_logo")
+            if firm_logo and firm_logo.filename:
+                # Create uploads directory if it doesn't exist
+                uploads_dir = os.path.join(current_app.root_path, 'uploads')
+                os.makedirs(uploads_dir, exist_ok=True)
+                
+                # Generate secure filename
+                firm_logo_filename = secure_filename(firm_logo.filename)
+                file_path = os.path.join(uploads_dir, firm_logo_filename)
+                firm_logo.save(file_path)
+                
+                # Set the URL path for the frontend
+                data['firm_logo_url'] = f"/uploads/{firm_logo_filename}"
+
+        else:
+            # Handle JSON payload
+            data = request.get_json(force=True)
+            firm_logo_filename = data.get("firm_logo_filename")
+
+        # Remove None values to avoid overwriting DB with null
+        data = {k: v for k, v in data.items() if v is not None}
+
+        # Update settings
+        settings = Settings.update_settings(**data, firm_logo_filename=firm_logo_filename)
+
+        if not settings:
+            return jsonify({"error": "No settings were updated"}), 400
+
+        # Commit changes if your update method doesn't
+        from app import db
+        db.session.commit()
 
         return jsonify(settings.to_dict()), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
+
 
 
 # Google Drive Settings APIs
@@ -104,76 +131,73 @@ def update_google_drive_settings():
 
 @dashboard_bp.route('/google-drive/authenticate', methods=['POST'])
 def authenticate_google_drive():
-    try:
-        data = request.get_json()
-        email = data.get('email')
-        backup_time = data.get('backup_time', '20:00')
-        auto_backup_enabled = data.get('auto_backup_enabled', False)
-        
-        if not email:
-            return jsonify({'error': 'Email is required'}), 400
-        
+    data = request.get_json()
+    email = data.get('email')
+    backup_time = data.get('backup_time', '20:00')
+    auto_backup_enabled = data.get('auto_backup_enabled', False)
 
-        # Clear any existing authentication to force re-authentication with new email
-        token_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'gdrive_token.pickle')
-        if os.path.exists(token_path):
-            os.remove(token_path)
-        
-        # Authenticate with Google Drive using the provided email
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
 
-        success = google_drive_service.authenticate(email)
-        
-        if not success:
-            return jsonify({'error': 'Failed to authenticate with Google Drive. Please ensure you have proper credentials setup.'}), 400
-        
+    # Clear existing authentication token
+    token_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'gdrive_token.pickle')
+    if os.path.exists(token_path):
+        os.remove(token_path)
 
-        # Save or update settings with the new email
-
-        settings = GoogleDriveSettings.query.first()
-        if not settings:
-            settings = GoogleDriveSettings()
-            db.session.add(settings)
-        
-        settings.email = email
-        settings.backup_time = backup_time
-        settings.auto_backup_enabled = auto_backup_enabled
-
-        
-        db.session.commit()
-        
-        # Setup backup schedule
-        if auto_backup_enabled:
-
-            schedule_backup(settings.backup_time)
-        
+    # Authenticate with Google Drive
+    success = google_drive_service.authenticate(email)
+    if not success:
         return jsonify({
-            'message': f'Google Drive authenticated successfully for {email}',
+            'error': 'Failed to authenticate with Google Drive. Please ensure you have proper credentials setup.'
+        }), 400
 
-            'settings': settings.to_dict()
-        }), 200
+    # Save or update settings
+    settings = GoogleDriveSettings.query.first()
+    if not settings:
+        settings = GoogleDriveSettings()
+        db.session.add(settings)
+
+    settings.email = email
+    settings.backup_time = backup_time
+    settings.auto_backup_enabled = auto_backup_enabled
+    db.session.commit()
+
+    # Setup or disable backup schedule
+    if auto_backup_enabled:
+        schedule_backup(scheduler, current_app, backup_time)
+    else:
+        # remove existing job if disabling auto-backup
+        job = scheduler.get_job("google_drive_backup")
+        if job:
+            scheduler.remove_job("google_drive_backup")
+
+    return jsonify({
+        'message': f'Google Drive authenticated successfully for {email}',
+        'settings': settings.to_dict()
+    }), 200
         
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # except Exception as e:
+    #     return jsonify({'error': str(e)}), 500
 
 
 # Backup APIs
 @dashboard_bp.route('/backup/download', methods=['GET'])
 def download_backup():
     try:
-        print("Starting backup process...")
+        
         
         # Create backup ZIP file
         zip_filename = backup_database()
         zip_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], zip_filename)
         
-        print(f"Backup created: {zip_filepath}")
+        
         
         # Check if file exists
         if not os.path.exists(zip_filepath):
-            print(f"Backup file not found at: {zip_filepath}")
+            
             return jsonify({'error': 'Backup file not found'}), 404
         
-        print(f"Sending file: {zip_filepath}")
+        
         
         # Send file for download with proper headers
         return send_file(
@@ -183,7 +207,6 @@ def download_backup():
             mimetype='application/zip'
         )
     except Exception as e:
-        print(f"Backup error: {str(e)}")
         return jsonify({'error': f'Backup failed: {str(e)}'}), 500
 
 @dashboard_bp.route('/backup/upload', methods=['POST'])
@@ -226,6 +249,12 @@ def upload_backup():
 @dashboard_bp.route('/dashboard', methods=['GET'])
 def get_dashboard_data():
     try:
+        from datetime import datetime
+        from sqlalchemy import func, and_
+        
+        # Get today's date
+        today = datetime.now().date()
+        
         # Get recent transactions
         recent_transactions = Transaction.query.order_by(Transaction.created_at.desc()).limit(5).all()
         
@@ -244,6 +273,57 @@ def get_dashboard_data():
         total_transactions = Transaction.query.count()
         total_expenses = db.session.query(db.func.sum(Expense.amount)).scalar() or 0
         
+        # Calculate today's statistics
+        today_bills = Bill.query.filter(func.date(Bill.created_at) == today).all()
+        
+        # Total bills today
+        total_bills_today = len(today_bills)
+        
+        # Debit and Credit bills today
+        debit_bills_today = len([b for b in today_bills if b.payment_type == 'debit'])
+        credit_bills_today = len([b for b in today_bills if b.payment_type == 'credit'])
+        
+        # Total amounts today
+        total_debit_amount_today = sum([b.total_amount for b in today_bills if b.payment_type == 'debit'])
+        total_credit_amount_today = sum([b.total_amount for b in today_bills if b.payment_type == 'credit'])
+        
+        # Stock-wise fine statistics (all time)
+        all_bills = Bill.query.all()
+        
+        # Group by stock type and calculate totals
+        stock_statistics = {}
+        for bill in all_bills:
+            item = bill.item or 'Other'
+            if item not in stock_statistics:
+                stock_statistics[item] = {
+                    'total_debit_fine': 0,
+                    'total_credit_fine': 0,
+                    'total_debit_amount': 0,
+                    'total_credit_amount': 0
+                }
+            
+            if bill.payment_type == 'debit':
+                stock_statistics[item]['total_debit_fine'] += bill.total_fine
+                stock_statistics[item]['total_debit_amount'] += bill.total_amount
+            else:
+                stock_statistics[item]['total_credit_fine'] += bill.total_fine
+                stock_statistics[item]['total_credit_amount'] += bill.total_amount
+        
+        # Today's stock-wise fine statistics
+        today_stock_statistics = {}
+        for bill in today_bills:
+            item = bill.item or 'Other'
+            if item not in today_stock_statistics:
+                today_stock_statistics[item] = {
+                    'total_debit_fine': 0,
+                    'total_credit_fine': 0
+                }
+            
+            if bill.payment_type == 'debit':
+                today_stock_statistics[item]['total_debit_fine'] += bill.total_fine
+            else:
+                today_stock_statistics[item]['total_credit_fine'] += bill.total_fine
+        
         dashboard_data = {
             'recent_transactions': [t.to_dict() for t in recent_transactions],
             'pending_customers': pending_customers[:5],  # Top 5 pending
@@ -254,6 +334,17 @@ def get_dashboard_data():
                 'bills': total_bills,
                 'transactions': total_transactions,
                 'expenses': total_expenses
+            },
+            'today_statistics': {
+                'total_bills': total_bills_today,
+                'debit_bills': debit_bills_today,
+                'credit_bills': credit_bills_today,
+                'total_debit_amount': total_debit_amount_today,
+                'total_credit_amount': total_credit_amount_today,
+                'stock_wise_fine': today_stock_statistics
+            },
+            'all_time_statistics': {
+                'stock_wise_statistics': stock_statistics
             }
         }
         
@@ -264,3 +355,38 @@ def get_dashboard_data():
 @dashboard_bp.route('/health', methods=['GET'])
 def health_check():
     return 'OK', 200
+
+# Offline support endpoints
+@dashboard_bp.route('/offline/setup', methods=['POST'])
+def setup_offline_data():
+    """Setup offline data backup for Electron app."""
+    try:
+        setup_offline_support()
+        return jsonify({'message': 'Offline data backup created successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@dashboard_bp.route('/offline/dashboard', methods=['GET'])
+def get_offline_dashboard_data():
+    """Get dashboard data for offline mode."""
+    try:
+        data = get_offline_dashboard()
+        return jsonify(data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@dashboard_bp.route('/offline/check', methods=['GET'])
+def check_offline_status():
+    """Check if offline data is available."""
+    try:
+        backup_data = offline_db.load_backup_data()
+        is_available = backup_data is not None
+        timestamp = backup_data.get('timestamp') if backup_data else None
+        
+        return jsonify({
+            'offline_data_available': is_available,
+            'backup_timestamp': timestamp,
+            'database_accessible': offline_db.is_database_accessible()
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

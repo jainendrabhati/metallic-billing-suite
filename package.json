@@ -1,5 +1,5 @@
 {
-  "name": "jewelry-management-system",
+  "name": "metalixx",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -79,7 +79,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "concurrently": "^8.2.2",
-    "electron": "^36.7.1",
+    "electron": "^36.8.1",
     "electron-builder": "^26.0.12",
     "electron-is-dev": "^3.0.1",
     "eslint": "^9.9.0",
@@ -95,7 +95,7 @@
   },
   "build": {
     "appId": "com.yourcompany.jewelryapp",
-    "productName": "Jewelry Management System",
+    "productName": "Silvertally",
     "directories": {
       "output": "release"
     },
@@ -114,7 +114,7 @@
     ],
     "win": {
       "target": "nsis",
-      "publisherName": "Your Company Name"
+      "publisherName": "Jainendra Bhati"
     },
     "nsis": {
       "oneClick": false,

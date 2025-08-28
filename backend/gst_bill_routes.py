@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, send_file
-from models import db, GSTBill, GSTBillItem, Settings
+from models import db, GSTBill, GSTBillItem, GSTCustomer, Settings
 from datetime import datetime
 import csv
 import io
@@ -83,6 +83,14 @@ def create_gst_bill():
         grand_total = float(data.get('grand_total', 0))
         data['amount_in_words'] = number_to_words(int(grand_total))
         
+        # Store customer data
+        if data.get('customer_name'):
+            GSTCustomer.create_or_update(
+                customer_name=data['customer_name'],
+                customer_address=data.get('customer_address'),
+                customer_gstin=data.get('customer_gstin')
+            )
+        
         # Create GST bill
         items_data = data.pop('items', [])
         bill = GSTBill.create(**data)
@@ -97,6 +105,9 @@ def create_gst_bill():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+    # except Exception as e:
+    #     db.session.rollback()
+    #     return jsonify({'error': str(e)}), 500
 
 @gst_bill_bp.route('/gst-bills/<int:bill_id>', methods=['PUT'])
 def update_gst_bill(bill_id):
@@ -104,43 +115,48 @@ def update_gst_bill(bill_id):
         bill = GSTBill.get_by_id(bill_id)
         if not bill:
             return jsonify({'error': 'GST bill not found'}), 404
-        
+
         data = request.get_json()
-        
-        # Convert date string to date object
-        if isinstance(data.get('date'), str):
+
+        # Remove timestamps from client
+        data.pop('created_at', None)
+        data.pop('updated_at', None)
+
+        # Parse 'date' if needed
+        if 'date' in data and isinstance(data['date'], str):
             data['date'] = datetime.strptime(data['date'], '%Y-%m-%d').date()
-        
-        # Convert amount to words
+
+        # Convert grand_total → words
         if 'grand_total' in data:
-            grand_total = float(data.get('grand_total', 0))
+            grand_total = float(data['grand_total'])
             data['amount_in_words'] = number_to_words(int(grand_total))
-        
+
         # Update bill fields
         items_data = data.pop('items', None)
         for key, value in data.items():
             if hasattr(bill, key):
                 setattr(bill, key, value)
-        
-        # Update items if provided
+
+        # Replace items if provided
         if items_data is not None:
-            # Delete existing items
-            for item in bill.items:
-                db.session.delete(item)
-            
-            # Create new items
+            GSTBillItem.query.filter_by(gst_bill_id=bill.id).delete()
             for item_data in items_data:
+                item_data.pop('created_at', None)   # avoid error in items too
+                item_data.pop('updated_at', None)
                 item_data['gst_bill_id'] = bill.id
-                GSTBillItem.create(**item_data)
-        
+                db.session.add(GSTBillItem(**item_data))
+
+        # Always set updated_at
         bill.updated_at = datetime.utcnow()
+
         db.session.commit()
-        return jsonify(bill.to_dict())
+        return jsonify(bill.to_dict()), 200
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@gst_bill_bp.route('/gst-bills/<int:bill_id>', methods=['DELETE'])
+@gst_bill_bp.route('/gst-bills/<int:bill_id>/delete', methods=['POST'])
 def delete_gst_bill(bill_id):
     try:
         bill = GSTBill.get_by_id(bill_id)

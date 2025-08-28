@@ -9,117 +9,125 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar, Download, FileText, Eye, Printer, Edit, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { transactionAPI, billAPI, customerAPI } from "@/services/api";
+import { billAPI, customerAPI } from "@/services/api";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import AppSidebar from "@/components/AppSidebar";
 import { useSidebar } from "@/components/SidebarProvider";
 import Navbar from "@/components/Navbar";
+import PDFPreviewModal from "@/components/PDFPreviewModal";
+import { generatePDFHeader, generateBankDetailsSection } from "@/components/PDFTemplateHeader";
+import { settingsAPI } from "@/services/api";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
-interface Transaction {
+
+interface Bill {
   id: number;
+  bill_number: string;
   customer_id: number;
-  customer_name?: string;
-  date: string;
-  type: "income" | "expense";
-  amount: number;
+  customer_name: string;
+  item_name: string;
+  item: string;
+  weight: number;
+  tunch: number;
+  wages: number;
+  wastage: number;
+  silver_amount: number;
+  additional_amount: number;
+  total_fine: number;
+  total_amount: number;
+  payment_type: string;
+  slip_no: string;
   description: string;
+  date: string;
+  created_at: string;
+  updated_at: string;
 }
-
 
 const TransactionsPage = () => {
   const { isOpen } = useSidebar();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [customerName, setCustomerName] = useState("");
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editTransaction, setEditTransaction] = useState<any>(null);
+  const [editBill, setEditBill] = useState<any>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewContent, setPreviewContent] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: transactions = [], refetch, isError, error } = useQuery({
-    queryKey: ['transactions', startDate, endDate, customerName],
-    queryFn: () => {
-      // If any filters are set, call getFiltered
-      if (startDate || endDate || customerName) {
-        return transactionAPI.getFiltered({ start_date: startDate, end_date: endDate, customer_name: customerName });
-      } else {
-        return transactionAPI.getAll();
-      }
-    },
+  
+  const { data: firmSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsAPI.getFirmSettings(),
   });
 
-  // Optional: Show errors for debugging
-  if (isError) {
-    console.error("Transaction query error:", error);
-  }
 
-  const updateTransactionMutation = useMutation({
+  const { data: bills = [], refetch, isError, error } = useQuery({
+    queryKey: ['bills'],
+    queryFn: () => billAPI.getAll(),
+  });
+
+  // Filter bills based on date and customer name
+  const filteredBills = bills.filter((bill: Bill) => {
+    let matches = true;
+    
+    if (startDate && bill.date < startDate) matches = false;
+    if (endDate && bill.date > endDate) matches = false;
+    if (customerName && !bill.customer_name.toLowerCase().includes(customerName.toLowerCase())) matches = false;
+    
+    return matches;
+  });
+
+  const updateBillMutation = useMutation({
     mutationFn: (data: { id: number; updates: any }) => {
-      // If updating bill fields, update the bill instead
-      if (data.updates.weight || data.updates.tunch || data.updates.wastage || data.updates.wages || data.updates.silver_amount || data.updates.payment_type || data.updates.item || data.updates.item_name) {
-        // Calculate new totals
-        const weight = data.updates.weight || editTransaction.weight;
-        const tunch = data.updates.tunch || editTransaction.tunch;
-        const wastage = data.updates.wastage || editTransaction.wastage;
-        const wages = data.updates.wages || editTransaction.wages;
-        const silverAmount = data.updates.silver_amount || editTransaction.silver_amount;
-        const paymentType = data.updates.payment_type || editTransaction.payment_type;
-        
-        const totalFine = weight * ((tunch + wastage) / 100);
-        const totalAmount = (weight * (wages / 1000)) + (paymentType === 'credit' ? silverAmount : 0);
-        
-        const billUpdates = {
-          ...data.updates,
-          total_fine: totalFine,
-          total_amount: totalAmount,
-        };
-        
-        return billAPI.update(editTransaction.bill_id, billUpdates);
-      } else {
-        return transactionAPI.update(data.id, data.updates);
-      }
+      return billAPI.update(data.id, data.updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bills'] });
       toast({
         title: "Success",
-        description: "Transaction updated successfully!",
+        description: "Bill updated successfully!",
       });
       setShowEditDialog(false);
-      setEditTransaction(null);
+      setEditBill(null);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update transaction.",
+        description: "Failed to update bill.",
         variant: "destructive",
       });
     },
   });
 
-  const deleteTransactionMutation = useMutation({
-    mutationFn: (data: { transactionId: number; billId?: number }) => {
-      if (data.billId) {
-        return billAPI.delete(data.billId);
-      } else {
-        return transactionAPI.delete(data.transactionId);
-      }
-    },
+  const deleteBillMutation = useMutation({
+    mutationFn: (billId: number) => billAPI.delete(billId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bills'] });
       toast({
         title: "Success",
-        description: "Transaction deleted successfully!",
+        description: "Bill deleted successfully!",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete transaction.",
+        description: "Failed to delete bill.",
         variant: "destructive",
       });
     },
@@ -133,202 +141,207 @@ const TransactionsPage = () => {
     setStartDate("");
     setEndDate("");
     setCustomerName("");
-    refetch();
   };
 
-  const handleExportCSV = async () => {
-    try {
-      await transactionAPI.exportCSV({ start_date: startDate, end_date: endDate, customer_name: customerName });
-      toast({
-        title: "Success",
-        description: "Transactions data is being downloaded.",
-      });
-    } catch (error) {
-      console.error("Failed to export CSV:", error);
-      toast({
-        title: "Error",
-        description: "Failed to export transactions to CSV.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleExportPDF = async () => {
-    try {
-      await transactionAPI.exportPDF({ start_date: startDate, end_date: endDate, customer_name: customerName });
-      toast({
-        title: "Success",
-        description: "Transactions PDF is being generated for download.",
-      });
-    } catch (error) {
-      console.error("Failed to export PDF:", error);
-      toast({
-        title: "Error",
-        description: "Failed to export transactions to PDF.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleViewDetails = (transaction: any) => {
-    setSelectedTransaction(transaction);
+  const handleViewDetails = (bill: Bill) => {
+    setSelectedBill(bill);
     setShowDetailsDialog(true);
   };
 
-  const handleEditTransaction = (transaction: any) => {
-    setEditTransaction({
-      id: transaction.id,
-      bill_id: transaction.bill_id,
-      amount: transaction.amount,
-      transaction_type: transaction.transaction_type,
-      description: transaction.description,
-      weight: transaction.weight || 0,
-      tunch: transaction.tunch || 0,
-      wastage: transaction.wastage || 0,
-      wages: transaction.wages || 0,
-      silver_amount: transaction.silver_amount || 0,
-      payment_type: transaction.transaction_type,
-      item: transaction.item || '',
-      item_name: transaction.item_name || '',
+  const handleEditBill = (bill: Bill) => {
+    setEditBill({
+      id: bill.id,
+      bill_number: bill.bill_number,
+      customer_id: bill.customer_id,
+      item_name: bill.item_name,
+      item: bill.item,
+      weight: bill.weight,
+      tunch: bill.tunch,
+      wages: bill.wages,
+      wastage: bill.wastage,
+      silver_amount: bill.silver_amount,
+      additional_amount: bill.additional_amount,
+      payment_type: bill.payment_type,
+      slip_no: bill.slip_no,
+      description: bill.description,
+      date: bill.date,
     });
     setShowEditDialog(true);
   };
 
-  const handleDeleteTransaction = (transaction: any) => {
-    if (confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
-      deleteTransactionMutation.mutate({
-        transactionId: transaction.id,
-        billId: transaction.bill_id
-      });
-    }
-  };
+  // const handleDeleteBill = (bill: Bill) => {
+  //   if (confirm("Are you sure you want to delete this bill? This action cannot be undone.")) {
+  //     deleteBillMutation.mutate(bill.id);
+  //   }
+  // };
 
-  const handleUpdateTransaction = () => {
-    if (editTransaction) {
-      const updates: any = {};
+  const handleUpdateBill = () => {
+    if (editBill) {
+      const updates: any = {
+        item_name: editBill.item_name,
+        item: editBill.item,
+        weight: parseFloat(editBill.weight),
+        tunch: parseFloat(editBill.tunch),
+        wages: parseFloat(editBill.wages),
+        wastage: parseFloat(editBill.wastage),
+        silver_amount: parseFloat(editBill.silver_amount),
+        additional_amount: parseFloat(editBill.additional_amount),
+        payment_type: editBill.payment_type,
+        slip_no: editBill.slip_no,
+        description: editBill.description,
+        date: editBill.date,
+      };
       
-      // Include all editable fields
-      if (editTransaction.weight) updates.weight = parseFloat(editTransaction.weight);
-      if (editTransaction.tunch) updates.tunch = parseFloat(editTransaction.tunch);
-      if (editTransaction.wastage) updates.wastage = parseFloat(editTransaction.wastage);
-      if (editTransaction.wages) updates.wages = parseFloat(editTransaction.wages);
-      if (editTransaction.silver_amount) updates.silver_amount = parseFloat(editTransaction.silver_amount);
-      if (editTransaction.payment_type) updates.payment_type = editTransaction.payment_type;
-      if (editTransaction.item) updates.item = editTransaction.item;
-      if (editTransaction.item_name) updates.item_name = editTransaction.item_name;
-      if (editTransaction.description) updates.description = editTransaction.description;
-      
-      updateTransactionMutation.mutate({
-        id: editTransaction.id,
+      updateBillMutation.mutate({
+        id: editBill.id,
         updates
       });
     }
   };
 
   const calculateTotals = () => {
-    if (!editTransaction) return { totalFine: 0, totalAmount: 0 };
+    if (!editBill) return { totalFine: 0, totalAmount: 0 };
     
-    const weight = parseFloat(editTransaction.weight) || 0;
-    const tunch = parseFloat(editTransaction.tunch) || 0;
-    const wastage = parseFloat(editTransaction.wastage) || 0;
-    const wages = parseFloat(editTransaction.wages) || 0;
-    const silverAmount = parseFloat(editTransaction.silver_amount) || 0;
+    const weight = parseFloat(editBill.weight) || 0;
+    const tunch = parseFloat(editBill.tunch) || 0;
+    const wastage = parseFloat(editBill.wastage) || 0;
+    const wages = parseFloat(editBill.wages) || 0;
+    const silverAmount = parseFloat(editBill.silver_amount) || 0;
+    const additionalAmount = parseFloat(editBill.additional_amount) || 0;
     
-    const totalFine = weight * ((tunch + wastage) / 100);
-    const totalAmount = (weight * (wages / 1000)) + (editTransaction.payment_type === 'credit' ? silverAmount : 0);
+    const rawTotalFine = weight * ((tunch + wastage) / 100);
+    
+    // Apply rounding logic
+    let totalFine;
+    if (rawTotalFine === 0) {
+      totalFine = 0;
+    } else {
+      const integerPart = Math.floor(rawTotalFine);
+      const decimalPart = rawTotalFine - integerPart;
+      
+      if (editBill.payment_type === 'debit') {
+        // For debit: if > 0.50, round up, otherwise round down
+        totalFine = decimalPart > 0.50 ? integerPart + 1 : integerPart;
+      } else {
+        // For credit: if > 0.70, round up, otherwise round down
+        totalFine = decimalPart > 0.70 ? integerPart + 1 : integerPart;
+      }
+    }
+    
+    let totalAmount = (weight * (wages / 1000)) + additionalAmount;
+      totalAmount += silverAmount;
+    
     
     return { totalFine, totalAmount };
   };
 
   const { totalFine, totalAmount } = calculateTotals();
 
-  const handlePrintTransaction = (transaction: any) => {
+  const handlePrintBill = (bill: Bill) => {
+    if ((window as any).printingInProgress) {
+      return;
+    }
+    
+    (window as any).printingInProgress = true;
     const printContent = `
       <html>
-        <head>
-          <title>Bill ${transaction.bill_number}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-            .bill-details { margin: 20px 0; }
-            .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            .table th, .table td { border: 1px solid #000; padding: 8px; text-align: left; }
-            .table th { background-color: #f0f0f0; }
-            .footer { margin-top: 30px; text-align: center; }
-            .signature { margin-top: 50px; }
-            @media print { 
-              body { margin: 0; } 
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Metalic Jewelers</h1>
-          </div>
-          <div class="bill-details">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-              <div>
-                <p><strong>Bill No:</strong> ${transaction.bill_number || 'N/A'}</p>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p><strong>Customer:</strong> ${transaction.customer_name}</p>
-                <p><strong>Type:</strong> ${transaction.transaction_type?.toUpperCase()}</p>
-              </div>
-            </div>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Weight (g)</th>
-                  <th>Tunch</th>
-                  <th>Wastage</th>
-                  <th>Wages</th>
-                  <th>Total Fine (g)</th>
-                  ${transaction.transaction_type === 'credit' ? '<th>Silver Amount</th>' : ''}
-                  <th>Total Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>${transaction.item || transaction.item_name || 'N/A'}</td>
-                  <td>${transaction.weight?.toFixed(2) || 'N/A'}</td>
-                  <td>${transaction.tunch?.toFixed(2) || 'N/A'}</td>
-                  <td>${transaction.wastage?.toFixed(2) || 'N/A'}</td>
-                  <td>${transaction.wages?.toFixed(2) || 'N/A'}</td>
-                  <td>${transaction.total_fine?.toFixed(2) || 'N/A'}</td>
-                  ${transaction.transaction_type === 'credit' ? `<td>₹${transaction.silver_amount?.toFixed(2) || '0.00'}</td>` : ''}
-                  <td>₹${transaction.amount?.toFixed(2) || '0.00'}</td>
-                </tr>
-              </tbody>
-            </table>
-            ${transaction.description ? `<div><p><strong>Description:</strong> ${transaction.description}</p></div>` : ''}
-          </div>
-          <div class="footer">
-            <div class="signature">
-              <div style="display: flex; justify-content: space-between; margin-top: 50px;">
-                <div>
-                  <p>_________________</p>
-                  <p>Customer Signature</p>
-                </div>
-                <div>
-                  <p>_________________</p>
-                  <p>Authorized Signature</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </body>
-      </html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; font-size: 14px; }
+      .header { text-align: center; border: 2px solid #000; padding: 15px; margin-bottom: 20px; }
+      .bill-details { margin: 20px 0; }
+      .item-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+      .item-table th, .item-table td { border: 1px solid #000; padding: 8px; text-align: left; }
+      .item-table th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
+      .footer { margin-top: 10px; } /* reduced from 30px */
+      .signature { display: flex; justify-content: space-between; margin-top: 20px; } /* reduced from 50px */
+      @media print { body { margin: 0; } }
+    </style>
+  </head>
+  <body>
+    ${generatePDFHeader({ firmSettings, title: "BILL RECEIPT" })}
+    <div class="bill-details">
+      <p><strong>Date:</strong> ${format(new Date(bill.date), 'dd/MM/yyyy')}</p>
+      <p><strong>Customer:</strong> ${bill.customer_name}</p>
+      <p><strong>Payment Type:</strong> ${bill.payment_type.toUpperCase()}</p>
+    </div>
+
+    <div class="item-details">
+      <table class="item-table">
+        <thead>
+          <tr>
+          <th>Item </th>
+            <th>Item Type</th>
+            <th>Weight</th>
+            <th>Tunch</th>
+            <th>Wastage</th>
+            <th>Wages</th>
+            <th>Fine</th>
+            <th>External Amount</th>
+            <th>Total Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${bill.item_name}</td>
+            <td>${bill.item}</td>
+            <td>${bill.weight?.toFixed(2)}</td>
+            <td>${bill.tunch?.toFixed(2)}</td>
+            <td>${bill.wastage?.toFixed(2)}</td>
+            <td>${bill.wages?.toFixed(2)}</td>
+            <td>${bill.total_fine?.toFixed(2)}g</td>
+            <td>${bill.silver_amount?.toFixed(2)}</td>
+            <td>₹${bill.total_amount?.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      ${bill.description ? `<div><p><strong>Description:</strong> ${bill.description}</p></div>` : ''}
+    </div>
+
+    <div class="footer">
+      <div class="signature" style="margin-top: 20px; width: 100%;">
+        <div style="text-align: left;">
+          <p>_________________</p>
+          <p>Customer Signature</p>
+        </div>
+        <div style="text-align: right;">
+          <p>_________________</p>
+          <p>Authorized Signature</p>
+        </div>
+      </div>
+    </div>
+ <div style="margin-top: 20px; text-align: center;">
+      <button onclick="window.print(); setTimeout(() => { window.printingInProgress = false; window.close(); }, 1000);" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">Print</button>
+    </div>
+  </body>
+</html>
     `;
     
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
-      printWindow.print();
+      
+      // Reset flag when window closes
+      printWindow.onbeforeunload = () => {
+        (window as any).printingInProgress = false;
+      };
+      
+      // Auto-reset flag after timeout as backup
+      setTimeout(() => {
+        (window as any).printingInProgress = false;
+      }, 5000);
+    } else {
+      (window as any).printingInProgress = false;
     }
+  };
+
+  const handlePrint = () => {
+    // The PDFPreviewModal handles printing
+  };
+
+  const handleDownload = () => {
+    // The PDFPreviewModal handles download
   };
 
   return (
@@ -338,24 +351,14 @@ const TransactionsPage = () => {
             <Navbar />
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Transactions</h1>
-        <div className="flex gap-2">
-          <Button onClick={handleExportCSV} variant="outline" className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button onClick={handleExportPDF} variant="outline" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Export PDF
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-black "> Transactions</h1>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Filter Transactions
+            Filter Bills
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -402,169 +405,132 @@ const TransactionsPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
+          <CardTitle>Bills History</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Bill Number</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Slip Number</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Amount</TableHead>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Weight</TableHead>
                   <TableHead>Total Fine</TableHead>
+                  <TableHead>Amount</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
+                  
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {transactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>{transaction.bill_number || 'N/A'}</TableCell>
-                    <TableCell>{transaction.customer_name}</TableCell>
-                    <TableCell>₹{transaction.amount.toFixed(2)}</TableCell>
-                    <TableCell>
-                      {transaction.weight && transaction.tunch && transaction.wastage 
-                        ? `${(transaction.weight * ((transaction.tunch + transaction.wastage) / 100)).toFixed(2)}g`
-                        : 'N/A'
-                      }
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        transaction.transaction_type === 'credit' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {transaction.transaction_type}
-                      </span>
-                    </TableCell>
-                    <TableCell>{transaction.description || 'None'}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewDetails(transaction)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditTransaction(transaction)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteTransaction(transaction)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handlePrintTransaction(transaction)}
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+               <TableBody>
+                    {[...filteredBills]
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      
+                      .map((bill: Bill) => (
+                        <TableRow key={bill.id}>
+                          <TableCell>{new Date(bill.date).toLocaleDateString('en-GB')}</TableCell>
+                          <TableCell>{bill.slip_no}</TableCell>
+                          <TableCell>{bill.customer_name}</TableCell>
+                          <TableCell>{bill.item_name}</TableCell>
+                          <TableCell>{bill.weight.toFixed(2)}g</TableCell>
+                          <TableCell>{bill.total_fine.toFixed(2)}g</TableCell>
+                          <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              bill.payment_type === 'credit'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {bill.payment_type}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                             
+                              <Button size="sm" onClick={() => handleEditBill(bill)}><Edit className="w-4 h-4" /></Button>
+                              <Button size="sm" onClick={() => handlePrintBill(bill)}><Printer className="w-4 h-4" /></Button>
+                              <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setSelectedBill(bill)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Bill</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete{" "}
+                                    <span className="font-semibold">
+                                      Bill #{selectedBill?.bill_number}
+                                    </span>
+                                    ? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => {
+                                      if (selectedBill) {
+                                        deleteBillMutation.mutate(selectedBill.id);
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
             </Table>
-            {transactions.length === 0 && (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                No transactions found
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Edit Transaction Dialog */}
+      {/* PDF Preview Modal */}
+      <PDFPreviewModal
+        isOpen={previewModalOpen}
+        onOpenChange={setPreviewModalOpen}
+        title={previewTitle}
+        content={previewContent}
+        onDownload={handleDownload}
+        onPrint={handlePrint}
+      />
+
+     
+      {/* Edit Bill Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Transaction</DialogTitle>
+            <DialogTitle>Edit Bill</DialogTitle>
           </DialogHeader>
-          {editTransaction && (
+          {editBill && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="editItemName">Item Name</Label>
+                  <Label htmlFor="editDate">Date</Label>
                   <Input
-                    id="editItemName"
-                    value={editTransaction.item_name}
-                    onChange={(e) => setEditTransaction({...editTransaction, item_name: e.target.value})}
+                    id="editDate"
+                    type="date"
+                    value={editBill.date}
+                    onChange={(e) => setEditBill({...editBill, date: e.target.value})}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="editItem">Item Type</Label>
-                  <Input
-                    id="editItem"
-                    value={editTransaction.item}
-                    onChange={(e) => setEditTransaction({...editTransaction, item: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editWeight">Weight (grams)</Label>
-                  <Input
-                    id="editWeight"
-                    type="number"
-                    step="0.001"
-                    value={editTransaction.weight}
-                    onChange={(e) => setEditTransaction({...editTransaction, weight: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editTunch">Tunch (%)</Label>
-                  <Input
-                    id="editTunch"
-                    type="number"
-                    step="0.01"
-                    value={editTransaction.tunch}
-                    onChange={(e) => setEditTransaction({...editTransaction, tunch: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editWastage">Wastage (%)</Label>
-                  <Input
-                    id="editWastage"
-                    type="number"
-                    step="0.01"
-                    value={editTransaction.wastage}
-                    onChange={(e) => setEditTransaction({...editTransaction, wastage: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editWages">Wages (per 1000)</Label>
-                  <Input
-                    id="editWages"
-                    type="number"
-                    step="0.01"
-                    value={editTransaction.wages}
-                    onChange={(e) => setEditTransaction({...editTransaction, wages: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editSilverAmount">Silver Amount</Label>
-                  <Input
-                    id="editSilverAmount"
-                    type="number"
-                    step="0.01"
-                    value={editTransaction.silver_amount}
-                    onChange={(e) => setEditTransaction({...editTransaction, silver_amount: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editType">Bill Type</Label>
+                  <Label htmlFor="editPaymentType">Payment Type</Label>
                   <Select 
-                    value={editTransaction.payment_type} 
-                    onValueChange={(value) => setEditTransaction({...editTransaction, payment_type: value})}
+                    value={editBill.payment_type} 
+                    onValueChange={(value) => setEditBill({...editBill, payment_type: value})}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -575,35 +541,103 @@ const TransactionsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-md">
                 <div>
-                  <Label>Calculated Total Fine</Label>
-                  <div className="text-lg font-semibold">{totalFine.toFixed(4)}g</div>
+                  <Label htmlFor="editItemName">Item Name</Label>
+                  <Input
+                    id="editItemName"
+                    value={editBill.item_name}
+                    onChange={(e) => setEditBill({...editBill, item_name: e.target.value})}
+                  />
                 </div>
                 <div>
-                  <Label>Calculated Total Amount</Label>
-                  <div className="text-lg font-semibold">₹{totalAmount.toFixed(2)}</div>
+                  <Label htmlFor="editItem">Item Type</Label>
+                  <Input
+                    id="editItem"
+                    value={editBill.item}
+                    onChange={(e) => setEditBill({...editBill, item: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editWeight">Weight (g)</Label>
+                  <Input
+                    id="editWeight"
+                    type="number"
+                    step="0.01"
+                    value={editBill.weight}
+                    onChange={(e) => setEditBill({...editBill, weight: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editTunch">Tunch (%)</Label>
+                  <Input
+                    id="editTunch"
+                    type="number"
+                    step="0.01"
+                    value={editBill.tunch}
+                    onChange={(e) => setEditBill({...editBill, tunch: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editWastage">Wastage (%)</Label>
+                  <Input
+                    id="editWastage"
+                    type="number"
+                    step="0.01"
+                    value={editBill.wastage}
+                    onChange={(e) => setEditBill({...editBill, wastage: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editWages">Wages (per 1000g)</Label>
+                  <Input
+                    id="editWages"
+                    type="number"
+                    step="0.01"
+                    value={editBill.wages}
+                    onChange={(e) => setEditBill({...editBill, wages: e.target.value})}
+                  />
+                </div>
+               
+                  <div>
+                    <Label htmlFor="editSilverAmount">External Amount</Label>
+                    <Input
+                      id="editSilverAmount"
+                      type="number"
+                      step="0.01"
+                      value={editBill.silver_amount}
+                      onChange={(e) => setEditBill({...editBill, silver_amount: e.target.value})}
+                    />
+                  </div>
+                
+                
+                <div>
+                  <Label htmlFor="editSlipNo">Slip No.</Label>
+                  <Input
+                    id="editSlipNo"
+                    value={editBill.slip_no}
+                    onChange={(e) => setEditBill({...editBill, slip_no: e.target.value})}
+                  />
                 </div>
               </div>
-              
               <div>
                 <Label htmlFor="editDescription">Description</Label>
                 <Textarea
                   id="editDescription"
-                  value={editTransaction.description}
-                  onChange={(e) => setEditTransaction({...editTransaction, description: e.target.value})}
-                  rows={3}
+                  value={editBill.description}
+                  onChange={(e) => setEditBill({...editBill, description: e.target.value})}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded">
+                <div>
+                  <strong>Calculated Total Fine:</strong> {totalFine.toFixed(2)}g
+                </div>
+                <div>
+                  <strong>Calculated Total Amount:</strong> ₹{totalAmount.toFixed(2)}
+                </div>
+              </div>
               <div className="flex gap-2">
-                <Button 
-                  onClick={handleUpdateTransaction}
-                  disabled={updateTransactionMutation.isPending}
-                  className="flex-1"
-                >
-                  {updateTransactionMutation.isPending ? "Updating..." : "Update Transaction"}
+                <Button onClick={handleUpdateBill} className="flex-1">
+                  Update Bill
                 </Button>
                 <Button 
                   variant="outline" 
@@ -617,94 +651,18 @@ const TransactionsPage = () => {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+    </div>
 
-      {/* View Details Dialog */}
-      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Transaction Details</DialogTitle>
-          </DialogHeader>
-          {selectedTransaction && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="font-medium">Bill Number:</label>
-                  <p>{selectedTransaction.bill_number || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="font-medium">Customer:</label>
-                  <p>{selectedTransaction.customer_name}</p>
-                </div>
-                <div>
-                  <label className="font-medium">Amount:</label>
-                  <p>₹{selectedTransaction.amount}</p>
-                </div>
-                <div>
-                  <label className="font-medium">Type:</label>
-                  <p>{selectedTransaction.transaction_type}</p>
-                </div>
-                {selectedTransaction.weight && (
-                  <div>
-                    <label className="font-medium">Weight:</label>
-                    <p>{selectedTransaction.weight} grams</p>
-                  </div>
-                )}
-                {selectedTransaction.tunch && (
-                  <div>
-                    <label className="font-medium">Tunch:</label>
-                    <p>{selectedTransaction.tunch}%</p>
-                  </div>
-                )}
-                {selectedTransaction.wages && (
-                  <div>
-                    <label className="font-medium">Wages:</label>
-                    <p>₹{selectedTransaction.wages}</p>
-                  </div>
-                )}
-                {selectedTransaction.wastage && (
-                  <div>
-                    <label className="font-medium">Wastage:</label>
-                    <p>{selectedTransaction.wastage}%</p>
-                  </div>
-                )}
-                {selectedTransaction.total_wages && (
-                  <div>
-                    <label className="font-medium">Total Wages:</label>
-                    <p>₹{selectedTransaction.total_wages/1000}</p>
-                  </div>
-                )}
-                {selectedTransaction.silver_amount && (
-                  <div>
-                    <label className="font-medium">Silver Amount:</label>
-                    <p>₹{selectedTransaction.silver_amount}</p>
-                  </div>
-                )}
-                {selectedTransaction.item && (
-                  <div>
-                    <label className="font-medium">Item:</label>
-                    <p>{selectedTransaction.item}</p>
-                  </div>
-                )}
-                <div className="col-span-2">
-                  <label className="font-medium">Description:</label>
-                  <p>{selectedTransaction.description}</p>
-                </div>
-              </div>
-              <Button 
-                onClick={() => handlePrintTransaction(selectedTransaction)}
-                className="w-full"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print Transaction
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-    </div>
-          
-     </>
+    <PDFPreviewModal
+      isOpen={previewModalOpen}
+      onOpenChange={setPreviewModalOpen}
+      title={previewTitle}
+      content={previewContent}
+      onDownload={handleDownload}
+      onPrint={handlePrint}
+    />
+    </>
   );
 };
 

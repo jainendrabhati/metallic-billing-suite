@@ -48,14 +48,9 @@ const items = [
     icon: Package,
   },
   {
-    title: "GST Bill",
+    title: "GST Bills",
     url: "/gst-bill",
     icon: FileText,
-  },
-  {
-    title: "GST Bill Logs",
-    url: "/gst-bill-logs",
-    icon: FileSpreadsheet,
   },
   {
     title: "Employees",
@@ -136,14 +131,7 @@ const AppSidebar = () => {
           ))}
         </ul>
       </nav>
-      <div className="p-4">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full py-2 text-sm font-semibold text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200"
-        >
-          {isOpen ? "Collapse" : "Expand"}
-        </button>
-      </div>
+      
     </aside>
   );
 };

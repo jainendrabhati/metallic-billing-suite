@@ -8,14 +8,25 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, Plus, Search, History, DollarSign } from "lucide-react";
+import { Users, Plus, Search, History, DollarSign, IndianRupee, Trash2  } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { employeeAPI, employeePaymentAPI, employeeSalaryAPI, Employee, EmployeePayment, EmployeeSalary } from "@/services/api";
+import { employeeAPI, employeePaymentAPI, employeeSalaryAPI, settingsAPI, Employee, EmployeePayment, EmployeeSalary } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import AppSidebar from "@/components/AppSidebar";
 import { useSidebar } from "@/components/SidebarProvider";
 import Navbar from "@/components/Navbar";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 
 const MONTHS = [
@@ -34,6 +45,7 @@ const EmployeesPage = () => {
   const [totalDays, setTotalDays] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDescription, setPaymentDescription] = useState("");
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
@@ -41,6 +53,11 @@ const EmployeesPage = () => {
   const [nameFilter, setNameFilter] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
   const [isNewEmployee, setIsNewEmployee] = useState(true);
+  const [showAddEmployeeDialog, setShowAddEmployeeDialog] = useState(false);
+  const [newEmployeeName, setNewEmployeeName] = useState("");
+  const [newEmployeePosition, setNewEmployeePosition] = useState("");
+  const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
+  const [selectedSalaryId, setSelectedSalaryId] = useState<number | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -60,6 +77,11 @@ const EmployeesPage = () => {
     queryKey: ['employeePayments', selectedEmployee?.id],
     queryFn: () => employeePaymentAPI.getByEmployeeId(selectedEmployee?.id || 0),
     enabled: !!selectedEmployee,
+  });
+
+  const { data: firmSettings } = useQuery({
+    queryKey: ['firmSettings'],
+    queryFn: settingsAPI.getFirmSettings,
   });
 
   const { data: selectedEmployeeSalaries = [] } = useQuery({
@@ -105,6 +127,28 @@ const EmployeesPage = () => {
     },
   });
 
+  const createSimpleEmployeeMutation = useMutation({
+    mutationFn: employeeAPI.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast({
+        title: "Success",
+        description: "Employee added successfully!",
+      });
+      setShowAddEmployeeDialog(false);
+      setNewEmployeeName("");
+      setNewEmployeePosition("");
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || "Failed to add employee. Please try again.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
   const createEmployeeSalaryMutation = useMutation({
     mutationFn: employeeSalaryAPI.create,
     onSuccess: () => {
@@ -135,6 +179,7 @@ const EmployeesPage = () => {
         description: "Payment added successfully!",
       });
       setPaymentAmount("");
+      setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
       setPaymentDescription("");
       setShowPaymentDialog(false);
     },
@@ -142,6 +187,44 @@ const EmployeesPage = () => {
       toast({
         title: "Error",
         description: "Failed to add payment. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEmployeePaymentMutation = useMutation({
+    mutationFn: employeePaymentAPI.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employeePayments', selectedEmployee?.id] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast({
+        title: "Success",
+        description: "Payment deleted successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete payment. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEmployeeSalaryMutation = useMutation({
+    mutationFn: employeeSalaryAPI.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employeeSalaries', selectedEmployee?.id] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast({
+        title: "Success",
+        description: "Salary record deleted successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete salary record. Please try again.",
         variant: "destructive",
       });
     },
@@ -171,60 +254,18 @@ const EmployeesPage = () => {
       return;
     }
 
-    if (isNewEmployee) {
-      if (!employeeName || !position) {
-        toast({
-          title: "Error",
-          description: "Please enter employee name and position.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check if employee already exists
-      const existingEmployee = (employees as Employee[]).find((emp: Employee) => 
-        emp.name.toLowerCase() === employeeName.toLowerCase()
-      );
-      
-      if (existingEmployee) {
-        toast({
-          title: "Error",
-          description: "Employee with this name already exists.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      
-      // Create new employee
-      createEmployeeMutation.mutate({
-        name: employeeName,
-        position: position,
-        monthly_salary: monthlySalary,
-        present_days: presentDays,
-        total_days: presentDays,
-        paid_amount: 0,
-      });
-    } else {
-      if (!selectedEmployeeId) {
-        toast({
-          title: "Error",
-          description: "Please select an employee.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Add salary for existing employee
-      createEmployeeSalaryMutation.mutate({
-        employee_id: parseInt(selectedEmployeeId),
-        month: selectedMonth,
-        year: parseInt(selectedYear),
-        monthly_salary: parseFloat(monthlySalary),
-        present_days: parseInt(presentDays),
-        total_days: parseInt(totalDays),
-      });
-    }
+  
+    // Single API call to create employee salary (will handle employee creation internally)
+    createEmployeeSalaryMutation.mutate({
+      employee_id: isNewEmployee ? null : parseInt(selectedEmployeeId),
+      employee_name: isNewEmployee ? employeeName : null,
+      employee_position: isNewEmployee ? position : null,
+      month: selectedMonth,
+      year: parseInt(selectedYear),
+      monthly_salary: parseFloat(monthlySalary),
+      present_days: parseFloat(presentDays),
+      total_days: parseInt(totalDays),
+    });
   };
 
   const handlePayment = (e: React.FormEvent) => {
@@ -241,8 +282,27 @@ const EmployeesPage = () => {
     createEmployeePaymentMutation.mutate({
       employee_id: selectedEmployee.id,
       amount: parseFloat(paymentAmount),
-      payment_date: format(new Date(), 'yyyy-MM-dd'),
+      payment_date: paymentDate,
       description: paymentDescription,
+    });
+  };
+
+  const handleDeletePayment = (paymentId: number) => {
+    if (window.confirm("Are you sure you want to delete this payment?")) {
+      deleteEmployeePaymentMutation.mutate(paymentId);
+    }
+  };
+
+  const handleDeleteSalary = (salaryId: number) => {
+      deleteEmployeeSalaryMutation.mutate(salaryId);
+    
+  };
+
+  const handleEditSalary = (salary: EmployeeSalary) => {
+    // You can implement salary editing functionality here
+    toast({
+      title: "Info",
+      description: "Salary editing functionality can be implemented here.",
     });
   };
 
@@ -259,6 +319,38 @@ const EmployeesPage = () => {
     }
   };
 
+  const handleAddEmployee = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newEmployeeName.trim() || !newEmployeePosition.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in both employee name and position.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if employee name already exists
+    const existingEmployee = employees.find((emp: Employee) => 
+      emp.name.toLowerCase() === newEmployeeName.toLowerCase()
+    );
+    
+    if (existingEmployee) {
+      toast({
+        title: "Error",
+        description: "Employee with this name already exists.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createSimpleEmployeeMutation.mutate({
+      name: newEmployeeName,
+      position: newEmployeePosition,
+    });
+  };
+
   return (
      <>
     <AppSidebar />
@@ -271,6 +363,13 @@ const EmployeesPage = () => {
             <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
             <p className="text-gray-600 mt-1">Manage employee details and track monthly salaries</p>
           </div>
+          <Button 
+            onClick={() => setShowAddEmployeeDialog(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Employee
+          </Button>
         </div>
 
         <Card className="shadow-lg border-0">
@@ -486,20 +585,22 @@ const EmployeesPage = () => {
                     <TableRow key={employee.id} className="hover:bg-gray-50 border-b border-gray-100">
                       <TableCell className="text-gray-700">{employee.name}</TableCell>
                       <TableCell className="text-gray-700">{employee.position}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.total_calculated_salary.toFixed(2) || 0}</TableCell>
-                      <TableCell className="text-gray-700">₹{employee.total_paid_amount.toFixed(2) || 0}</TableCell>
-                      <TableCell className="text-gray-700">
-                        <Badge variant={(employee.remaining_amount || 0) > 0 ? "destructive" : "default"}>
-                          ₹{employee.remaining_amount || 0}
-                        </Badge>
-                      </TableCell>
+                      <TableCell className="text-gray-700">₹{Number(employee.total_calculated_salary || 0).toFixed(2)}</TableCell>
+                      <TableCell className="text-gray-700">₹{Number(employee.total_paid_amount || 0).toFixed(2)}</TableCell>
+                     <TableCell className="text-gray-700">
+                    <Badge
+                      variant={Number(employee.remaining_amount) > 0 ? "destructive" : "default"}
+                    >
+                      ₹{Number(employee.remaining_amount || 0).toFixed(0)}
+                    </Badge>
+                  </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedEmployee(employee);
                             setShowPaymentDialog(true);
                           }}>
-                            <DollarSign className="h-4 w-4" />
+                            <IndianRupee  className="h-4 w-4" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedEmployee(employee);
@@ -549,6 +650,18 @@ const EmployeesPage = () => {
                 className="col-span-3"
               />
             </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="paymentDate" className="text-right">
+                Date
+              </Label>
+              <Input
+                type="date"
+                id="paymentDate"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="paymentDescription" className="text-right">
                 Description
@@ -581,17 +694,69 @@ const EmployeesPage = () => {
                   <TableHead>Amount</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(employeePayments as EmployeePayment[]).map((payment: EmployeePayment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>₹{payment.amount}</TableCell>
-                    <TableCell>{format(new Date(payment.payment_date), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell>{payment.description}</TableCell>
-                  </TableRow>
-                ))}
+                {(employeePayments as EmployeePayment[])
+                  .slice() // make a shallow copy to avoid mutating original state
+                  .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()) 
+                  // 👆 sorts by date (latest first, change order for ascending)
+                  .map((payment: EmployeePayment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell>₹{payment.amount}</TableCell>
+                      <TableCell>{format(new Date(payment.payment_date), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>{payment.description}</TableCell>
+                      <TableCell>
+                        {/* <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeletePayment(payment.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Delete
+                        </Button> */}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                           <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setSelectedPaymentId(payment.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                          </AlertDialogTrigger>
+
+                             <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Payment</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete{" "}
+                                        <span className="font-semibold">
+                                          Payment #{selectedPaymentId}
+                                        </span>
+                                        ? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => {
+                                          if (selectedPaymentId !== null) {
+                                            handleDeletePayment(selectedPaymentId);
+                                          }
+                                        }}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
+
             </Table>
             {(employeePayments as EmployeePayment[]).length === 0 && (
               <div className="text-center py-8 text-gray-500">
@@ -617,6 +782,7 @@ const EmployeesPage = () => {
                   <TableHead>Present Days</TableHead>
                   <TableHead>Total Days</TableHead>
                   <TableHead>Calculated Salary</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -627,10 +793,51 @@ const EmployeesPage = () => {
                     <TableCell>₹{salary.monthly_salary}</TableCell>
                     <TableCell>{salary.present_days}</TableCell>
                     <TableCell>{salary.total_days}</TableCell>
-                    <TableCell>₹{salary.calculated_salary}</TableCell>
+                    <TableCell>₹{Number(salary.calculated_salary).toFixed(0)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setSelectedSalaryId(salary.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Salary</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete{" "}
+                                <span className="font-semibold">
+                                  Salary #{selectedSalaryId}
+                                </span>
+                                ? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  if (selectedSalaryId !== null) {
+                                    handleDeleteSalary(selectedSalaryId);
+                                  }
+                                }}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
+
             </Table>
             {(selectedEmployeeSalaries as EmployeeSalary[]).length === 0 && (
               <div className="text-center py-8 text-gray-500">
@@ -640,10 +847,61 @@ const EmployeesPage = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-          </div>
-     </>
+    
+
+     {/* Add Employee Dialog */}
+        <Dialog open={showAddEmployeeDialog} onOpenChange={setShowAddEmployeeDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Employee</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleAddEmployee} className="space-y-4">
+              <div>
+                <Label htmlFor="newEmployeeName">Employee Name</Label>
+                <Input
+                  id="newEmployeeName"
+                  type="text"
+                  value={newEmployeeName}
+                  onChange={(e) => setNewEmployeeName(e.target.value)}
+                  placeholder="Enter employee name"
+                  className="border-gray-300 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <Label htmlFor="newEmployeePosition">Position</Label>
+                <Input
+                  id="newEmployeePosition"
+                  type="text"
+                  value={newEmployeePosition}
+                  onChange={(e) => setNewEmployeePosition(e.target.value)}
+                  placeholder="Enter employee position"
+                  className="border-gray-300 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowAddEmployeeDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={createSimpleEmployeeMutation.isPending}
+                >
+                  {createSimpleEmployeeMutation.isPending ? "Adding..." : "Add Employee"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+        </div>
+    </>
   );
 };
+
 
 export default EmployeesPage;

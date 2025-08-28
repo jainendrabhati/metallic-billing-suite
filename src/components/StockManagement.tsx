@@ -10,7 +10,7 @@ import { Package, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stockAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, addMinutes } from "date-fns";
 
 const StockManagement = () => {
   const [addAmount, setAddAmount] = useState("");

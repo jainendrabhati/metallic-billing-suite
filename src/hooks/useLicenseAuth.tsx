@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { licenseAPI } from "@/services/licenseAPI";
 import { useToast } from "@/hooks/use-toast";
+// import { licenseValidationService } from "@/services/licenseValidationService";
 
 export const useLicenseAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,12 +24,20 @@ export const useLicenseAuth = () => {
   }, []);
 
   const validateLicense = useCallback(async () => {
+    // Skip validation if offline
+    if (!navigator.onLine) {
+      console.log("App is offline, skipping license validation");
+      return;
+    }
+
     try {
       await licenseAPI.validateLicense();
       console.log("License validation successful");
     } catch (error: any) {
       console.error("License validation failed:", error.message);
-      if (error.message === "License validation failed") {
+      
+      // Only show error and force re-auth for actual license failures, not network issues
+      if (error.message === "License validation failed" && navigator.onLine) {
         setIsAuthenticated(false);
         setShowAuthDialog(true);
         toast({
@@ -36,6 +45,10 @@ export const useLicenseAuth = () => {
           description: "Your license key is no longer valid. Please re-authenticate.",
           variant: "destructive",
         });
+      } else if (!navigator.onLine) {
+        console.log("License validation skipped due to offline status");
+      } else {
+        console.log("License validation failed due to network issues, continuing normally");
       }
     }
   }, [toast]);
@@ -50,15 +63,21 @@ export const useLicenseAuth = () => {
   }, [checkLicenseStatus]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      // Clean up validation service if not authenticated  
+      // licenseValidationService.destroy();
+      return;
+    }
 
-    // Set up periodic validation every 6 hours (6 * 60 * 60 * 1000 = 21600000ms)
-    const validationInterval = setInterval(() => {
-      validateLicense();
-    }, 21600000);
+    // The licenseValidationService automatically handles 24-hour validation
+    // No need for manual intervals here as the service manages everything
+    console.log('License validation service is now active');
 
-    return () => clearInterval(validationInterval);
-  }, [isAuthenticated, validateLicense]);
+    return () => {
+      // Don't destroy the service here as it should persist throughout the app lifecycle
+      // It will be destroyed only when authentication fails
+    };
+  }, [isAuthenticated]);
 
   return {
     isAuthenticated,

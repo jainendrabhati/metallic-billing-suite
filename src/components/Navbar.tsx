@@ -8,20 +8,14 @@ const Navbar = () => {
   });
 
   return (
-    <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3">
-      {firmSettings?.logo_path && (
-        <img 
-          src={firmSettings.logo_path} 
-          alt="Company Logo" 
-          className="h-8 w-8 object-contain rounded"
-        />
-      )}
-      {firmSettings?.firm_name && (
-        <h1 className="text-lg font-semibold text-gray-800">
-          {firmSettings.firm_name}
-        </h1>
-      )}
-    </div>
+   <div className="bg-white border-b border-gray-200 px-4 py-3 text-center"> 
+  <h1 
+    className="font-bold text-gray-800 text-[30px]" 
+   
+  >
+    {firmSettings?.firm_name || 'Metalic App'}
+  </h1>
+</div>
   );
 };
 

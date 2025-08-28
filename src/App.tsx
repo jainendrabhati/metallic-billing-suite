@@ -9,7 +9,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/NotFound";
 import AppSidebar from "@/components/AppSidebar";
 import GSTBillPage from "./pages/GSTBillPage";
-import GSTBillLogsPage from "./pages/GSTBillLogsPage";
+// import GSTBillLogsPage from "./pages/GSTBillLogsPage";
 import Navbar from "@/components/Navbar";
 import { SidebarProvider } from "@/components/SidebarProvider";
 import LicenseAuthDialog from "@/components/LicenseAuthDialog";
@@ -56,7 +56,7 @@ function AppContent() {
     );
   }
 
-  if (!isAuthenticated) {
+if (!isAuthenticated) {
     return (
       <>
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -76,7 +76,7 @@ function AppContent() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex flex-col w-full">
-        <Navbar />
+        {/* <Navbar /> */}
         <div className="flex flex-1">
           <AppSidebar />
           <main className="flex-1">
@@ -86,7 +86,8 @@ function AppContent() {
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/gst-bill" element={<GSTBillPage />} />
               
-              <Route path="/gst-bill-logs" element={<GSTBillLogsPage />} />
+              {/* <Route path="/gst-bill-logs" element={<GSTBillLogsPage />} /> */}
+             
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/pending-list" element={<PendingListPage />} />
               

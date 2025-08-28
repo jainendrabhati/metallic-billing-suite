@@ -41,10 +41,12 @@ const LicenseAuthDialog = ({ open, onAuthSuccess }: LicenseAuthDialogProps) => {
     setIsLoading(true);
 
     try {
-      await licenseAPI.authenticateLicense(formData);
+      const result = await licenseAPI.authenticateLicense(formData);
       toast({
         title: "Authentication Successful",
-        description: "License has been validated and saved",
+        description: result.offline 
+          ? "License saved for offline use" 
+          : "License validated successfully",
       });
       onAuthSuccess();
     } catch (error: any) {

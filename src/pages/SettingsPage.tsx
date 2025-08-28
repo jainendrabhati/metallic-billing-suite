@@ -19,6 +19,8 @@ const SettingsPage = () => {
     firmName: "",
     gstNumber: "",
     address: "",
+    mobile: "",
+    email: "",
     accountNumber: "",
     accountHolderName: "",
     ifscCode: "",
@@ -59,6 +61,8 @@ const SettingsPage = () => {
         branchAddress: settings.branch_address || "",
         city: settings.city || "",
         firmLogo: null,
+        mobile: settings.mobile || "",
+        email: settings.email || "",
       });
     }
   }, [settings]);
@@ -74,18 +78,18 @@ const SettingsPage = () => {
   }, [driveSettings]);
 
   const updateSettingsMutation = useMutation({
-    mutationFn: settingsAPI.updateFirmSettings,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["firmSettings"] });
-      toast({ title: "Success", description: "Settings saved successfully!" });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save settings. Please try again.",
-        variant: "destructive",
-      });
-    },
+  mutationFn: (data: Record<string, any>) => settingsAPI.updateFirmSettings(data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["firmSettings"] });
+    toast({ title: "Success", description: "Settings saved successfully!" });
+  },
+  onError: () => {
+    toast({
+      title: "Error",
+      description: "Failed to save settings. Please try again.",
+      variant: "destructive",
+    });
+  },
   });
 
   const downloadBackupMutation = useMutation({
@@ -143,32 +147,44 @@ const SettingsPage = () => {
   };
 
   const handleSaveSettings = () => {
+  let payload: any;
+
+  if (firmSettings.firmLogo) {
+    // Send FormData if we have a file
     const formData = new FormData();
-    
-    // Add all form fields to FormData
     formData.append("firm_name", firmSettings.firmName);
     formData.append("gst_number", firmSettings.gstNumber);
     formData.append("address", firmSettings.address);
     formData.append("city", firmSettings.city);
     formData.append("account_number", firmSettings.accountNumber);
     formData.append("account_holder_name", firmSettings.accountHolderName);
+    formData.append("mobile", firmSettings.mobile);
+    formData.append("email", firmSettings.email);
     formData.append("ifsc_code", firmSettings.ifscCode);
     formData.append("branch_address", firmSettings.branchAddress);
+    formData.append("firm_logo", firmSettings.firmLogo);
+    payload = formData;
+  } else {
+    // Send JSON if no file
+    payload = {
+      firm_name: firmSettings.firmName,
+      gst_number: firmSettings.gstNumber,
+      address: firmSettings.address,
+      city: firmSettings.city,
+      mobile: firmSettings.mobile,
+      email: firmSettings.email,
+      account_number: firmSettings.accountNumber,
+      account_holder_name: firmSettings.accountHolderName,
+      ifsc_code: firmSettings.ifscCode,
+      branch_address: firmSettings.branchAddress,
+    };
+  }
 
-    if (firmSettings.firmLogo) {
-      formData.append("firm_logo", firmSettings.firmLogo);
-    }
+  console.log("Payload being sent:", payload instanceof FormData ? Object.fromEntries(payload.entries()) : payload);
 
-    console.log('Sending form data:', Object.fromEntries(formData.entries()));
-    updateSettingsMutation.mutate(formData);
-  };
+  updateSettingsMutation.mutate(payload);
+};
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFirmSettings((prev) => ({ ...prev, firmLogo: file }));
-    }
-  };
 
   return (
     <>
@@ -216,6 +232,28 @@ const SettingsPage = () => {
                     className="mt-1"
                   />
                 </div>
+                 <div>
+                  <Label htmlFor="mobile">Mobile</Label>
+                  <Input
+                    id="mobile"
+                    value={firmSettings.mobile}
+                    onChange={(e) =>
+                      setFirmSettings((prev) => ({ ...prev, mobile: e.target.value }))
+                    }
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={firmSettings.email}
+                    onChange={(e) =>
+                      setFirmSettings((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    className="mt-1"
+                  />
+                </div>
                 <div>
                   <Label htmlFor="address">Address</Label>
                   <Textarea
@@ -238,44 +276,6 @@ const SettingsPage = () => {
                     className="mt-1"
                   />
                 </div>
-
-                <div>
-                  <Label htmlFor="firmLogo">Firm Logo</Label>
-                  <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    {firmSettings.firmLogo ? (
-                      <div className="space-y-2">
-                        <Image className="h-8 w-8 text-gray-400 mx-auto" />
-                        <p className="text-sm text-gray-600">{firmSettings.firmLogo.name}</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => document.getElementById("logo-upload")?.click()}
-                        >
-                          Change Logo
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Image className="h-8 w-8 text-gray-400 mx-auto" />
-                        <p className="text-sm text-gray-600">Upload your firm logo</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => document.getElementById("logo-upload")?.click()}
-                        >
-                          Choose File
-                        </Button>
-                      </div>
-                    )}
-                    <input
-                      id="logo-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
@@ -290,7 +290,7 @@ const SettingsPage = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="accountNumber">Account Number</Label>
+                  <Label htmlFor="accountNumber">Account Holder Name & Number</Label>
                   <Input
                     id="accountNumber"
                     value={firmSettings.accountNumber}
@@ -301,7 +301,7 @@ const SettingsPage = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="accountHolderName">Account Holder Name</Label>
+                  <Label htmlFor="accountHolderName">Bank Name </Label>
                   <Input
                     id="accountHolderName"
                     value={firmSettings.accountHolderName}
@@ -332,6 +332,34 @@ const SettingsPage = () => {
                     }
                     className="mt-1"
                   />
+                </div>
+                 <div>
+                  <Label htmlFor="firmLogo">Firm Logo</Label>
+                  <div className="mt-1">
+                    <Input
+                      id="firmLogo"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setFirmSettings(prev => ({ ...prev, firmLogo: file }));
+                        }
+                      }}
+                      className="border-gray-300 focus:border-blue-500"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Upload your firm logo (JPG, PNG, etc.)</p>
+                    {settings?.firm_logo_url && (
+                      <div className="mt-2">
+                        <img 
+                          src={settings.firm_logo_url} 
+                          alt="Current logo" 
+                          className="h-16 w-16 object-contain border rounded"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Current logo</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

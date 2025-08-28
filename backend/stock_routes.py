@@ -54,6 +54,7 @@ def add_stock():
     try:
         data = request.get_json()
         stock = Stock.add_stock(data['item_name'], data['amount'], data.get('description', "Stock added"))
+        
         return jsonify(stock.to_dict()), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -108,7 +109,7 @@ def update_stock_item(item_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@stock_bp.route('/stock-items/<int:item_id>', methods=['DELETE'])
+@stock_bp.route('/stock-items/<int:item_id>/delete', methods=['POST'])
 def delete_stock_item(item_id):
     try:
         item = StockItem.get_by_id(item_id)
