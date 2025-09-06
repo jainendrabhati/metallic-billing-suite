@@ -22,7 +22,7 @@ Flask backend with SQLite3 database for the Metalic billing application.
    python run.py
    ```
 
-The server will start on `http://localhost:5000`
+The server will start on `http://127.0.0.1:5000`
 
 ## API Endpoints
 

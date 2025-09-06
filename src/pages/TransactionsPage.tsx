@@ -216,16 +216,17 @@ const TransactionsPage = () => {
     if (rawTotalFine === 0) {
       totalFine = 0;
     } else {
-      const integerPart = Math.floor(rawTotalFine);
-      const decimalPart = rawTotalFine - integerPart;
-      
-      if (editBill.payment_type === 'debit') {
-        // For debit: if > 0.50, round up, otherwise round down
-        totalFine = decimalPart > 0.50 ? integerPart + 1 : integerPart;
-      } else {
-        // For credit: if > 0.70, round up, otherwise round down
-        totalFine = decimalPart > 0.70 ? integerPart + 1 : integerPart;
-      }
+      // const integerPart = Math.floor(rawTotalFine);
+      // const decimalPart = rawTotalFine - integerPart;
+      // // totalFine = rawTotalFine;
+      // if (editBill.payment_type === 'debit') {
+      //   // For debit: if > 0.50, round up, otherwise round down
+      //   totalFine = decimalPart > 0.50 ? integerPart + 1 : integerPart;
+      // } else {
+      //   // For credit: if > 0.70, round up, otherwise round down
+      //   totalFine = decimalPart > 0.70 ? integerPart + 1 : integerPart;
+      // }
+      totalFine = rawTotalFine;
     }
     
     let totalAmount = (weight * (wages / 1000)) + additionalAmount;
@@ -275,7 +276,7 @@ const TransactionsPage = () => {
             <th>Weight</th>
             <th>Tunch</th>
             <th>Wastage</th>
-            <th>Wages</th>
+            <th>Wages (Per KG)</th>
             <th>Fine</th>
             <th>External Amount</th>
             <th>Total Amount</th>
@@ -588,7 +589,7 @@ const TransactionsPage = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="editWages">Wages (per 1000g)</Label>
+                  <Label htmlFor="editWages">Wages (per KG)</Label>
                   <Input
                     id="editWages"
                     type="number"

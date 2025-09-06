@@ -44,7 +44,7 @@ const ExpensesPage = () => {
       const params = new URLSearchParams();
       if (fromDate) params.append('from_date', fromDate);
       if (toDate) params.append('to_date', toDate);
-      return fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/expenses?${params.toString()}`)
+      return fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000/api'}/expenses?${params.toString()}`)
         .then(res => res.json());
     },
   });

@@ -622,12 +622,25 @@ class OfflineService {
     if (this.isOnline && (!this.isCacheValid() || !this.cache.settings)) {
       try {
         const settings = await this.makeRequest(`${API_BASE_URL}/settings`);
+        if (settings.firm_logo_url && !settings.firm_logo_url.startsWith("http")) {
+          settings.firm_logo_url = `http://localhost:5000/${settings.firm_logo_url}`;
+        }
         this.cache.settings = settings;
         this.cache.lastUpdated = Date.now();
         this.saveToLocalStorage();
         return settings;
       } catch (error) {
         console.warn('Failed to fetch settings online, using cache:', error);
+      }
+    }
+
+    if (this.cache.settings && this.cache.settings.firm_logo_url) {
+      if (!this.cache.settings.firm_logo_url.startsWith("http")) {
+        this.cache.settings.firm_logo_url = `http://localhost:5000/${this.cache.settings.firm_logo_url}`;
+      } else if (this.cache.settings.firm_logo_url.includes("localhost:8080")) {
+        // Fix old cached URLs that point to port 8080
+        this.cache.settings.firm_logo_url = this.cache.settings.firm_logo_url.replace("localhost:8080", "localhost:5000");
+        this.saveToLocalStorage(); // Save the corrected URL
       }
     }
     return this.cache.settings;

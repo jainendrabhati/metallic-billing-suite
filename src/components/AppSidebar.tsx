@@ -98,13 +98,13 @@ const AppSidebar = () => {
       }`}
     >
       <div className="flex items-center justify-center h-16 shrink-0">
-        <span
-          className={`text-lg font-bold text-gray-900 transition-opacity duration-300 ${
-            isOpen ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          Metalic
-        </span>
+       <span
+  className={`text-2xl font-extrabold tracking-wide transition-all duration-300 cursor-pointer select-none ${
+    isOpen ? "opacity-100 scale-105" : "opacity-0 scale-95"
+  } text-black hover:text-gray-800 hover:scale-110`}
+>
+  SILVERTALLY
+</span>
       </div>
       <nav className="flex-1 py-4">
         <ul>

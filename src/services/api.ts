@@ -1,5 +1,5 @@
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000/api';
 
 
 // Type definitions
@@ -704,7 +704,7 @@ export const settingsAPI = {
 
     // ✅ Ensure firm_logo_url is always absolute
     if (data.firm_logo_url && !data.firm_logo_url.startsWith("http")) {
-      data.firm_logo_url = `http://localhost:5000/${data.firm_logo_url}`;
+      data.firm_logo_url = `http://127.0.0.1:5000/${data.firm_logo_url}`;
     }
 
     return data;
@@ -739,7 +739,7 @@ export const settingsAPI = {
 
     // ✅ Fix logo URL after update too
     if (data.firm_logo_url && !data.firm_logo_url.startsWith("http")) {
-      data.firm_logo_url = `${API_BASE_URL}${data.firm_logo_url}`;
+      data.firm_logo_url = `http://localhost:5000/${data.firm_logo_url}`;
     }
 
     return data;
@@ -805,7 +805,7 @@ export const settingsAPI = {
                       + now.toLocaleDateString("en-GB").replace(/\//g, "-");
 
       // ✅ Use in filename
-      let filename = `metalic_backup_${timestamp}.zip`;
+      let filename = `Silvertally_${timestamp}.zip`;
 
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);

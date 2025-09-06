@@ -9,7 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, StockItem, Stock, FirmSettings, EmployeeSalary
+from models import db, Customer, Bill, Transaction, Expense, Employee, EmployeePayment, StockItem, Stock, FirmSettings, EmployeeSalary, Settings, GSTCustomer, GSTBill, GSTBillItem, BillItem, GoogleDriveSettings, License
 
 
 import uuid
@@ -34,7 +34,6 @@ def save_uploaded_file(file, subfolder=''):
         # Return relative URL path
         return f"/uploads/{subfolder}/{filename}" if subfolder else f"/uploads/{filename}"
     except Exception as e:
-        print(f"Error saving file: {e}")
         return None
 
 def export_to_csv(data, data_type):
@@ -110,7 +109,7 @@ def export_to_pdf(data, data_type):
                     logo.hAlign = 'LEFT'
                     elements.append(logo)
                 except Exception as e:
-                    print(f"Could not load logo: {e}")
+                    return None
             firm_name_style = ParagraphStyle('FirmName', parent=styles['h1'], alignment=1)
             elements.append(Paragraph(firm_settings.firm_name, firm_name_style))
             firm_details_style = ParagraphStyle('FirmDetails', parent=styles['Normal'], alignment=1, spaceBefore=6)
@@ -202,7 +201,7 @@ def export_to_pdf(data, data_type):
         # Title
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30, alignment=1)
-        title = Paragraph(f"Metalic Jewelers - {data_type.title()} Report", title_style)
+        title = Paragraph(f"Silvertally - {data_type.title()} Report", title_style)
         elements.append(title)
         elements.append(Spacer(1, 12))
         
@@ -229,7 +228,7 @@ def backup_database():
     """Create a backup of the entire database as CSV files in a ZIP"""
     with current_app.app_context():  # Ensure Flask app context is active during scheduled tasks
 
-        timestamp = datetime.now().strftime("%H-%M-%S_%d-%m-%Y")
+        timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         zip_filename = f"Silvertally_Backup_{timestamp}.zip"
         upload_folder = current_app.config.get('UPLOAD_FOLDER', 'backups')
         os.makedirs(upload_folder, exist_ok=True)
@@ -252,7 +251,13 @@ def backup_database():
                 'employee_payments': EmployeePayment.query.all(),
                 'stock_items': StockItem.query.all(),
                 'stock': Stock.query.all(),
-                'firm_settings': FirmSettings.query.all()
+                'firm_settings': FirmSettings.query.all(),
+                'settings': Settings.query.all(),
+                'gst_customers': GSTCustomer.query.all(),
+                'gst_bills': GSTBill.query.all(),
+                'gst_bill_items': GSTBillItem.query.all(),
+                'bill_items': BillItem.query.all(),
+                'google_drive_settings': GoogleDriveSettings.query.all(),
             }
 
             csv_files = []
@@ -307,7 +312,13 @@ def get_model_database_fields(model_name):
         'employee_payments': ['id', 'employee_id', 'amount', 'payment_date', 'description', 'created_at', 'updated_at'],
         'stock_items': ['id', 'item_name', 'current_weight', 'description', 'created_at', 'updated_at'],
         'stock': ['id', 'item_name', 'amount', 'transaction_type', 'description', 'created_at'],
-        'firm_settings': ['id', 'firm_name', 'gst_number', 'address', 'firm_logo_url', 'created_at', 'updated_at']
+        'firm_settings': ['id', 'firm_name', 'gst_number', 'address', 'firm_logo_url', 'created_at', 'updated_at'],
+        'settings': ['id', 'firm_name', 'gst_number', 'address','mobile','city','email','account_number','account_holder_name','ifsc_code','branch_address', 'firm_logo_url', 'backup_time', 'created_at', 'updated_at'],
+        'gst_customers': ['id', 'customer_name', 'customer_address', 'customer_gstin', 'created_at', 'updated_at'],
+        'gst_bills': ['id', 'bill_number','date','customer_name', 'customer_address', 'customer_gstin','total_amount_before_tax','cgst_percentage', 'igst_percentage','sgst_percentage', 'cgst_amount', 'sgst_amount', 'igst_amount', 'grand_total','time','place','amount_in_words', 'created_at', 'updated_at'],
+        'gst_bill_items': ['id','gst_bill_id', 'description', 'hsn', 'weight', 'rate', 'amount', 'created_at', 'updated_at'],
+        'bill_items': ['id', 'bill_id', 'item_name', 'weight', 'rate', 'amount', 'created_at', 'updated_at'],
+        'google_drive_settings': ['id', 'email', 'backup_time', 'is_authenticated', 'created_at', 'updated_at'],
     }
     return fields_map.get(model_name, [])
 
@@ -320,101 +331,113 @@ def restore_database(zip_file_path):
     try:
         # Create temporary directory to extract ZIP
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Extract ZIP file
             with zipfile.ZipFile(zip_file_path, 'r') as zipf:
                 zipf.extractall(temp_dir)
-            
-            # Clear existing data (be careful!)
+
+            # Clear existing data
             try:
+                db.session.query(GSTBillItem).delete()
+                db.session.query(BillItem).delete()
+                db.session.query(GSTBill).delete()
+                db.session.query(Bill).delete()
                 db.session.query(EmployeePayment).delete()
                 db.session.query(EmployeeSalary).delete()
                 db.session.query(Employee).delete()
                 db.session.query(Stock).delete()
                 db.session.query(StockItem).delete()
                 db.session.query(Transaction).delete()
-                db.session.query(Bill).delete()
                 db.session.query(Expense).delete()
+                db.session.query(GSTCustomer).delete()
                 db.session.query(Customer).delete()
+                db.session.query(GoogleDriveSettings).delete()
+                db.session.query(License).delete()
+                db.session.query(Settings).delete()
                 db.session.query(FirmSettings).delete()
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
                 raise Exception(f"Failed to clear existing data: {str(e)}")
-            
-            # Restore data from CSV files in correct order
+
+            # Order of restore
             csv_files_order = [
+                ('settings.csv', Settings),
+                ('firm_settings.csv', FirmSettings),
+                ('google_drive_settings.csv', GoogleDriveSettings),
+                ('license.csv', License),
                 ('customers.csv', Customer),
+                ('gst_customers.csv', GSTCustomer),
                 ('employees.csv', Employee),
                 ('bills.csv', Bill),
+                ('gst_bills.csv', GSTBill),
+                ('bill_items.csv', BillItem),
+                ('gst_bill_items.csv', GSTBillItem),
                 ('transactions.csv', Transaction),
                 ('expenses.csv', Expense),
                 ('employee_salaries.csv', EmployeeSalary),
                 ('employee_payments.csv', EmployeePayment),
                 ('stock_items.csv', StockItem),
                 ('stock.csv', Stock),
-                ('firm_settings.csv', FirmSettings)
             ]
-            
+
+            # Restore data
             for csv_filename, model_class in csv_files_order:
                 csv_filepath = os.path.join(temp_dir, csv_filename)
-                
-                # Skip if CSV file doesn't exist
                 if not os.path.exists(csv_filepath):
-                    
                     continue
-                
+
                 try:
                     with open(csv_filepath, 'r', encoding='utf-8') as csvfile:
                         reader = csv.DictReader(csvfile)
-                        
-                        # Get only valid database fields for this model
                         model_name = csv_filename.replace('.csv', '')
                         valid_fields = get_model_database_fields(model_name)
-                        
+
                         for row in reader:
-                            # Filter to only include valid database fields and non-empty values
                             data = {}
                             for key, value in row.items():
-                                if key in valid_fields and value and value.strip():  # Only valid fields with non-empty values
-                                    # Handle date fields
-                                    if key in ['date', 'payment_date'] and value:
-                                        try:
-                                            # Try different date formats
-                                            if 'T' in value:  # ISO format
-                                                data[key] = datetime.fromisoformat(value.replace('Z', '+00:00')).date()
-                                            else:  # Simple date format
-                                                data[key] = datetime.strptime(value, '%Y-%m-%d').date()
-                                        except:
-                                            continue  # Skip invalid dates
-                                    elif key in ['created_at', 'updated_at'] and value:
-                                        try:
-                                            if 'T' in value:  # ISO format
-                                                data[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
-                                            else:  # Simple date format
-                                                data[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
-                                        except:
-                                            pass  # Skip timestamp fields if invalid
-                                    elif key == 'id':
-                                        continue  # Skip ID for auto-increment
-                                    else:
-                                        data[key] = value
-                            
-                            if data:  # Only create if we have valid data
+                                if key not in valid_fields:
+                                    continue
+                                if not value or not value.strip():
+                                    continue
+
+                                # Handle special fields
+                                if key in ['date', 'payment_date']:
+                                    try:
+                                        if 'T' in value:
+                                            data[key] = datetime.fromisoformat(value.replace('Z', '+00:00')).date()
+                                        else:
+                                            data[key] = datetime.strptime(value, '%Y-%m-%d').date()
+                                    except:
+                                        continue
+                                elif key in ['created_at', 'updated_at']:
+                                    try:
+                                        if 'T' in value:
+                                            data[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                        else:
+                                            data[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                                    except:
+                                        pass
+                                elif key == 'id':
+                                    continue  # skip auto-increment
+                                elif key == 'auto_backup_enabled':
+                                    # Convert string 'True'/'False' to boolean
+                                    data[key] = str(value).lower() in ('true', '1', 'yes')
+                                elif key == 'hsn':
+                                    # Always string, fallback to '0000'
+                                    data[key] = str(value).strip() if value.strip() else "0000"
+                                else:
+                                    data[key] = value
+
+                            if data:
                                 try:
                                     instance = model_class(**data)
                                     db.session.add(instance)
-                                except Exception as e:
-                                    
+                                except Exception:
                                     continue
-                
-                except Exception as e:
-                   
+                except Exception:
                     continue
-            
+
             db.session.commit()
-            
+
     except Exception as e:
         db.session.rollback()
-
         raise Exception(f"Database restore failed: {str(e)}")
-

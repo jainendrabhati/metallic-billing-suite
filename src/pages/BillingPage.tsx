@@ -117,16 +117,18 @@ const BillingPage = () => {
   // Apply rounding logic
   const totalFine = (() => {
     if (rawTotalFine === 0) return 0;
-    const integerPart = Math.floor(rawTotalFine);
-    const decimalPart = rawTotalFine - integerPart;
-    
-    if (paymentType === 'debit') {
-      // For debit: if > 0.50, round up, otherwise round down
-      return decimalPart > 0.50 ? integerPart + 1 : integerPart;
-    } else {
-      // For credit: if > 0.70, round up, otherwise round down
-      return decimalPart > 0.70 ? integerPart + 1 : integerPart;
-    }
+    return rawTotalFine;
+    // const integerPart = Math.floor(rawTotalFine);
+
+    // const decimalPart = rawTotalFine - integerPart;
+    // return rawTotalFine;
+    // if (paymentType === 'debit') {
+    //   // For debit: if > 0.50, round up, otherwise round down
+    //   return decimalPart > 0.50 ? integerPart + 1 : integerPart;
+    // } else {
+    //   // For credit: if > 0.70, round up, otherwise round down
+    //   return decimalPart > 0.70 ? integerPart + 1 : integerPart;
+    // }
   })();
 
   const totalAmount = (() => {

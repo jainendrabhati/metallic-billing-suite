@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Users, CreditCard, TrendingUp, TrendingDown, Package, Clock, DollarSign, HardHat, Wifi, WifiOff} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { customerAPI, billAPI, transactionAPI, expenseAPI, settingsAPI } from "@/services/api";
+// import { customerAPI, billAPI, transactionAPI, expenseAPI, settingsAPI } from "@/services/api";
+import { hybridAPI } from "@/services/hybridAPI";
 import { format } from "date-fns";
 import AppSidebar from "@/components/AppSidebar";
 import { useSidebar } from "@/components/SidebarProvider";
@@ -33,58 +34,44 @@ const Dashboard = () => {
   // Fetch data with offline support
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
-    queryFn: isOnline ? customerAPI.getAll : () => offlineService.getCustomers(),
-    staleTime: isOnline ? 0 : Infinity,
+    queryFn: () => hybridAPI.getCustomers(),
   });
 
   const { data: bills = [] } = useQuery({
     queryKey: ['bills'],
-    queryFn: isOnline ? billAPI.getAll : () => offlineService.getBills(),
-    staleTime: isOnline ? 0 : Infinity,
+    queryFn: () => hybridAPI.getBills(),
   });
 
   const { data: pendingCustomers = [] } = useQuery({
     queryKey: ['customers', 'pending'],
-    queryFn: isOnline ? customerAPI.getPendingList : () => offlineService.getPendingList(),
-    staleTime: isOnline ? 0 : Infinity,
+    queryFn: () => hybridAPI.getPendingCustomers(),
   });
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
-    queryFn: isOnline ? () => fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/employees`).then(r => r.json()) : () => offlineService.getEmployees(),
-    staleTime: isOnline ? 0 : Infinity,
+    queryFn: () => hybridAPI.getEmployees(),
   });
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['transactions'],
-    queryFn: isOnline ? () => transactionAPI.getAll() : () => offlineService.getTransactions(),
-    staleTime: isOnline ? 0 : Infinity,
+    queryFn: () => hybridAPI.getTransactions(),
   });
 
   const { data: expenses = [] } = useQuery({
     queryKey: ['expenses'],
-    queryFn: isOnline ? () => expenseAPI.getAll() : () => offlineService.getExpenses(),
-    staleTime: isOnline ? 0 : Infinity,
+    queryFn: () => hybridAPI.getExpenses(),
   });
 
   const { data: firmSettings } = useQuery({
     queryKey: ['firmSettings'],
-    queryFn: isOnline ? settingsAPI.getFirmSettings : () => offlineService.getSettings(),
-    staleTime: isOnline ? 0 : Infinity,
+    queryFn: () => hybridAPI.getSettings(),
   });
 
   // Fetch dashboard statistics
   const { data: dashboardData } = useQuery({
     queryKey: ['dashboard'],
-    queryFn: async () => {
-      if (!isOnline) return null;
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/dashboard`);
-      return response.json();
-    },
-    enabled: isOnline,
-  });
-
-  // Update dashboard stats when data changes
+    queryFn: () => hybridAPI.getDashboardData(),
+  });  // Update dashboard stats when data changes
   useEffect(() => {
     if (dashboardData) {
       setDashboardStats(dashboardData);
@@ -188,20 +175,7 @@ const Dashboard = () => {
                 <h1 className="text-3xl font-bold text-slate-800">
                   {firmSettings?.firm_name || 'Dashboard'}
                 </h1>
-                {/* Connection Status */}
-                <div className="flex items-center gap-2 mt-1">
-                  {isOnline ? (
-                    <div className="flex items-center gap-1 text-green-600">
-                      <Wifi className="h-4 w-4" />
-                      <span className="text-sm">Online</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 text-red-600">
-                      <WifiOff className="h-4 w-4" />
-                      <span className="text-sm">Offline</span>
-                    </div>
-                  )}
-                </div>
+                
               </div>
             </div>
             <div className="text-right">

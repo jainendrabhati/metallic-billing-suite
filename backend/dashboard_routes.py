@@ -1,14 +1,14 @@
 from flask import Blueprint, request, jsonify, send_file, current_app
-from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, Settings, GoogleDriveSettings
+from models import db, Transaction, Customer, Stock, Bill, Employee, Expense, Settings, GoogleDriveSettings, GoogleDriveAuth
 from utils import backup_database, restore_database
-from google_drive_service import google_drive_service, schedule_backup, setup_backup_scheduler
+from google_drive_service import google_drive_service, schedule_daily_backup, setup_backup_scheduler
 from offline_support import setup_offline_support, get_offline_dashboard, offline_db
 import os
 from werkzeug.utils import secure_filename
 from scheduler import scheduler
 from flask import current_app
-from google_drive_service import schedule_backup
-
+import datetime
+from google_drive_service import schedule_daily_backup
 
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -93,12 +93,17 @@ def update_settings():
 @dashboard_bp.route('/google-drive/settings', methods=['GET'])
 def get_google_drive_settings():
     try:
-        settings = GoogleDriveSettings.query.first()
-        if not settings:
-            settings = GoogleDriveSettings()
-            db.session.add(settings)
-            db.session.commit()
-        return jsonify(settings.to_dict()), 200
+        
+        auth_record = GoogleDriveAuth.query.order_by(GoogleDriveAuth.id.desc()).first()
+        if not auth_record:
+            # Return default settings if no authenticated user
+            return jsonify({
+                'email': '',
+                'backup_time': '20:00',
+                'auto_backup_enabled': False,
+                'authenticated': False
+            }), 200
+        return jsonify(auth_record.to_dict()), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -106,24 +111,32 @@ def get_google_drive_settings():
 def update_google_drive_settings():
     try:
         data = request.get_json()
-        settings = GoogleDriveSettings.query.first()
+        settings = GoogleDriveSettings.query.order_by(GoogleDriveSettings.id.desc()).first()
+        auth_record = GoogleDriveAuth.query.order_by(GoogleDriveAuth.id.desc()).first()
         
         if not settings:
             settings = GoogleDriveSettings()
             db.session.add(settings)
-        
+            
+        if not auth_record:
+            auth_record = GoogleDriveAuth()
+            db.session.add(auth_record)
+
         if 'email' in data:
             settings.email = data['email']
+            auth_record.email = data['email']
         if 'backup_time' in data:
             settings.backup_time = data['backup_time']
+            auth_record.backup_time = data['backup_time']
         if 'auto_backup_enabled' in data:
             settings.auto_backup_enabled = data['auto_backup_enabled']
+            auth_record.auto_backup_enabled = data['auto_backup_enabled']
         
         db.session.commit()
         
         # Update backup schedule if enabled
         if settings.auto_backup_enabled and settings.backup_time:
-            schedule_backup(settings.backup_time)
+            schedule_daily_backup(scheduler, current_app, settings.backup_time)
         
         return jsonify(settings.to_dict()), 200
     except Exception as e:
@@ -131,53 +144,81 @@ def update_google_drive_settings():
 
 @dashboard_bp.route('/google-drive/authenticate', methods=['POST'])
 def authenticate_google_drive():
-    data = request.get_json()
-    email = data.get('email')
-    backup_time = data.get('backup_time', '20:00')
-    auto_backup_enabled = data.get('auto_backup_enabled', False)
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        backup_time = data.get('backup_time', '20:00')
+        auto_backup_enabled = data.get('auto_backup_enabled', False)
 
-    if not email:
-        return jsonify({'error': 'Email is required'}), 400
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
 
-    # Clear existing authentication token
-    token_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'gdrive_token.pickle')
-    if os.path.exists(token_path):
-        os.remove(token_path)
+        # Validate email format
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email):
+            return jsonify({'error': 'Invalid email format'}), 400
 
-    # Authenticate with Google Drive
-    success = google_drive_service.authenticate(email)
-    if not success:
-        return jsonify({
-            'error': 'Failed to authenticate with Google Drive. Please ensure you have proper credentials setup.'
-        }), 400
+        # Clear any old token files that might conflict
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+        old_files = ['gdrive_token.pickle', 'token.pickle', 'token.json']
+        for old_file in old_files:
+            old_path = os.path.join(upload_folder, old_file)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except:
+                    pass
 
-    # Save or update settings
-    settings = GoogleDriveSettings.query.first()
-    if not settings:
-        settings = GoogleDriveSettings()
-        db.session.add(settings)
-
-    settings.email = email
-    settings.backup_time = backup_time
-    settings.auto_backup_enabled = auto_backup_enabled
-    db.session.commit()
-
-    # Setup or disable backup schedule
-    if auto_backup_enabled:
-        schedule_backup(scheduler, current_app, backup_time)
-    else:
-        # remove existing job if disabling auto-backup
-        job = scheduler.get_job("google_drive_backup")
-        if job:
-            scheduler.remove_job("google_drive_backup")
-
-    return jsonify({
-        'message': f'Google Drive authenticated successfully for {email}',
-        'settings': settings.to_dict()
-    }), 200
+        # Initialize the service properly
+        from google_drive_service import GoogleDriveService
+        gdrive_service = GoogleDriveService()
         
-    # except Exception as e:
-    #     return jsonify({'error': str(e)}), 500
+        # Authenticate with Google Drive
+        success = gdrive_service.authenticate(email)
+        if not success:
+            return jsonify({
+                'error': 'Authentication failed. Please ensure you select the correct Google account and grant all required permissions.',
+                'details': 'Make sure to complete the OAuth flow in your browser and allow access to Google Drive.'
+            }), 400
+
+        # Save or update settings in GoogleDriveAuth model
+        from models import GoogleDriveAuth
+        auth_record = GoogleDriveAuth.query.order_by(GoogleDriveAuth.id.desc()).first()
+        if not auth_record:
+            auth_record = GoogleDriveAuth(email=email)
+            db.session.add(auth_record)
+        # auth_record.email = email
+        auth_record.backup_time = backup_time
+        auth_record.auto_backup_enabled = auto_backup_enabled
+        auth_record.authenticated = True
+        db.session.commit()
+
+        # Setup or disable backup schedule
+        if auto_backup_enabled:
+            schedule_daily_backup(scheduler, current_app, backup_time)
+        else:
+            # remove existing job if disabling auto-backup
+            job = scheduler.get_job("google_drive_backup")
+            if job:
+                scheduler.remove_job("google_drive_backup")
+
+        return jsonify({
+            'message': f'Google Drive authenticated successfully for {email}',
+            'settings': auth_record.to_dict(),
+            'authenticated': True
+        }), 200
+        
+    except Exception as e:
+         # Log the full error for debugging
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Google Drive authentication error: {error_details}")
+        
+        return jsonify({
+            'error': f'Authentication failed: {str(e)}',
+            'details': 'Please try again and ensure you complete the OAuth flow in your browser.'
+        }), 500
 
 
 # Backup APIs

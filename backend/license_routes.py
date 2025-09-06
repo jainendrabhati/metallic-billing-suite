@@ -74,21 +74,21 @@ def validate_license():
                 
         except (requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             # Network is unavailable, continue to local validation
-            print("Supabase validation failed due to network issues, continuing with local validation")
             pass
         
-        # Fallback to localhost validation with error handling
+        # Fallback to validation with error handling
         try:
             validation_data = {
                 'name': license_entry.name,
                 'key': license_entry.activation_key
             }
             
-            response = requests.post('http://localhost:6000/validate', json=validation_data, timeout=5)
+            response = requests.post('https://deemskrvkghcjlnyzpnw.supabase.co/functions/v1/check-user-status', json=validation_data, timeout=5)
             
             if response.status_code == 200:
                 return jsonify({'message': 'License validated successfully'}), 200
             elif response.status_code == 401:
+                delete_license()
                 return jsonify({'error': 'License validation failed'}), 401
             else:
                 return jsonify({'error': 'Validation server error'}), 500
@@ -96,11 +96,9 @@ def validate_license():
         except (requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             # Both external services are unavailable (offline mode)
             # Allow the application to continue running
-            print("Both validation services unavailable, allowing offline usage")
             return jsonify({'message': 'License validated successfully (offline mode)'}), 200
             
     except Exception as e:
-        print(f"License validation error: {str(e)}")
         # Return success for any unexpected errors to keep app running
         return jsonify({'message': 'License validated successfully (fallback)'}), 200
 

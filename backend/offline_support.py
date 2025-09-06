@@ -37,7 +37,6 @@ class OfflineDatabase:
             conn.close()
             return True
         except Exception as e:
-            print(f"Database not accessible: {e}")
             return False
 
     def backup_data_to_json(self, backup_dir=None):
@@ -75,10 +74,10 @@ class OfflineDatabase:
                         table_data.append(row_dict)
                     
                     backup_data['tables'][table] = table_data
-                    print(f"Backed up {len(table_data)} records from {table}")
+                    
                     
                 except sqlite3.OperationalError as e:
-                    print(f"Table {table} not found or error: {e}")
+                    
                     backup_data['tables'][table] = []
             
             # Save backup data
@@ -87,11 +86,9 @@ class OfflineDatabase:
                 json.dump(backup_data, f, indent=2, default=str)
             
             conn.close()
-            print(f"Backup saved to {backup_file}")
             return backup_file
             
         except Exception as e:
-            print(f"Backup failed: {e}")
             return None
 
     def load_backup_data(self, backup_dir=None):
@@ -108,7 +105,6 @@ class OfflineDatabase:
             with open(backup_file, 'r') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"Failed to load backup data: {e}")
             return None
 
     def get_offline_dashboard_data(self):
@@ -196,7 +192,6 @@ class OfflineDatabase:
             }
             
         except Exception as e:
-            print(f"Error processing offline data: {e}")
             return self._get_empty_dashboard_data()
 
     def _get_empty_dashboard_data(self):
@@ -235,11 +230,11 @@ def setup_offline_support():
     try:
         backup_file = offline_db.backup_data_to_json()
         if backup_file:
-            print(f"Offline support setup complete. Backup saved to: {backup_file}")
+            return backup_file
         else:
-            print("Failed to setup offline support")
+            return None
     except Exception as e:
-        print(f"Error setting up offline support: {e}")
+        return None
 
 def get_offline_dashboard():
     """Get dashboard data for offline mode."""
@@ -249,4 +244,3 @@ if __name__ == "__main__":
     # Test the offline support
     setup_offline_support()
     data = get_offline_dashboard()
-    print("Offline dashboard data:", json.dumps(data, indent=2))

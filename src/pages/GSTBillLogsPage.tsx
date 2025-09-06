@@ -194,7 +194,7 @@ const GSTBillLogsPage = () => {
             <table style="width: 100%; margin-top: 20px;">
               <tr>
                 <td style="width: 50%; vertical-align: top;">
-                  <strong>Bank Name:</strong> ${firmSettings?.account_holder_name || 'STATE BANK OF INDIA'}<br>
+                  <strong>Bank Name:</strong> ${firmSettings?.account_holder_name}<br>
                   <strong>Branch:</strong> ${firmSettings?.branch_address || 'Benad Road, Jaipur'}<br>
                   <strong>A/c Name & Number:</strong> ${firmSettings?.account_number || '61338285502'}<br>
                   <strong>IFSC Code:</strong> ${firmSettings?.ifsc_code || 'SBIN0032380'}<br><br>

@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Search, UserPlus, Phone, MapPin, Users, Eye, FileText, Download, Calendar, Edit, Plus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { customerAPI, billAPI } from "@/services/api";
+// import { customerAPI, billAPI } from "@/services/api";
+import { hybridAPI } from "@/services/hybridAPI";
 import { format, intlFormat } from "date-fns";
 import AppSidebar from "@/components/AppSidebar";
 import Navbar from "@/components/Navbar";
@@ -17,7 +18,7 @@ import { useSidebar } from "@/components/SidebarProvider";
 import EditCustomerDialog from "@/components/EditCustomerDialog";
 import { useToast } from "@/hooks/use-toast";
 import { generatePDFHeader, generateBankDetailsSection } from "@/components/PDFTemplateHeader";
-import { settingsAPI } from "@/services/api";
+// import { settingsAPI } from "@/services/api";
 
 
 const CustomersPage = () => {
@@ -40,17 +41,20 @@ const CustomersPage = () => {
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
-    queryFn: customerAPI.getAll,
+    // queryFn: customerAPI.getAll,
+    queryFn: () => hybridAPI.getCustomers(),
   });
 
   const { data: firmSettings } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => settingsAPI.getFirmSettings(),
+    // queryFn: () => settingsAPI.getFirmSettings(),
+    queryFn: () => hybridAPI.getSettings(),
   });
 
   // Create customer mutation
   const createCustomerMutation = useMutation({
-    mutationFn: customerAPI.create,
+    // mutationFn: customerAPI.create,
+    mutationFn: (data: any) => hybridAPI.createCustomer(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
@@ -73,12 +77,18 @@ const CustomersPage = () => {
 
   const { data: bills = [] } = useQuery({
     queryKey: ['bills'],
-    queryFn: billAPI.getAll,
+    // queryFn: billAPI.getAll,
+    queryFn: () => hybridAPI.getBills(),
   });
 
   const { data: selectedCustomer } = useQuery({
     queryKey: ['customer', selectedCustomerId],
-    queryFn: () => selectedCustomerId ? customerAPI.getById(selectedCustomerId) : null,
+    // queryFn: () => selectedCustomerId ? customerAPI.getById(selectedCustomerId) : null,
+    queryFn: async () => {
+      if (!selectedCustomerId) return null;
+      const customers = await hybridAPI.getCustomers();
+      return customers.find((c: any) => c.id === selectedCustomerId);
+    },
     enabled: !!selectedCustomerId,
   });
 
@@ -88,7 +98,8 @@ const CustomersPage = () => {
     
     if (!fromDate && !toDate) return matchesSearch;
     
-    const customerBills = bills.filter(bill => bill.customer_id === customer.id);
+    // const customerBills = bills.filter(bill => bill.customer_id === customer.id);
+    const customerBills = Array.isArray(bills) ? bills.filter((bill: any) => bill.customer_id === customer.id) : [];
     
     if (customerBills.length === 0) return false;
     
@@ -332,7 +343,7 @@ const CustomersPage = () => {
       <th style="text-align: center;">Weight (g)</th>
       <th style="text-align: center;">Tunch (%)</th>
       <th style="text-align: center;">Wastage (%)</th>
-      <th style="text-align: center;">Wages</th>
+      <th style="text-align: center;">Wages (Per KG)</th>
       <th style="text-align: center;">Total Fine (g)</th>
       <th style="text-align: center;">Total Amount</th>
       <th style="text-align: center;">Description</th>
@@ -672,7 +683,7 @@ const CustomersPage = () => {
                                                     <TableHead>Weight (g)</TableHead>
                                                     <TableHead>Tunch (%)</TableHead>
                                                     <TableHead>Wastage (%)</TableHead>
-                                                    <TableHead>Wages</TableHead>
+                                                    <TableHead>Wages (Per KG)</TableHead>
                                                     <TableHead>Total Fine (g)</TableHead>
                                                     <TableHead>Description</TableHead>
                                                     <TableHead>Total Amount</TableHead>

@@ -13,7 +13,7 @@ const Navbar = () => {
     className="font-bold text-gray-800 text-[30px]" 
    
   >
-    {firmSettings?.firm_name || 'Metalic App'}
+    {firmSettings?.firm_name || 'SILVERTALLY'}
   </h1>
 </div>
   );

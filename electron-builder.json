@@ -14,17 +14,8 @@
     "!backend/__pycache__{,/**}",
     "!**/*.pyc"
   ],
-  "extraResources": [
-    {
-      "from": "backend",
-      "to": "backend",
-      "filter": [
-        "!**/__pycache__{,/**}",
-        "!**/*.pyc",
-        "!envs{,/**}"
-      ]
-    }
-  ],
+  "asar": true,
+  "asarUnpack": [],
   "win": {
     "target": [
       {

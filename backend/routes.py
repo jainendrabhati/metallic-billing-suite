@@ -11,6 +11,7 @@ from license_routes import license_bp
 from gst_bill_routes import gst_bill_bp
 from offline_routes import offline_bp
 from gst_customer_routes import gst_customer_bp
+from health_routes import health_bp
 
 
 # Create main API blueprint
@@ -28,3 +29,5 @@ api_bp.register_blueprint(license_bp)
 api_bp.register_blueprint(gst_bill_bp)
 api_bp.register_blueprint(offline_bp)
 api_bp.register_blueprint(gst_customer_bp)
+api_bp.register_blueprint(health_bp)
+

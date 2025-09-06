@@ -349,5 +349,4 @@ def get_gst_bills_csv_data():
         
         return output.getvalue()
     except Exception as e:
-        print(f"Error generating GST bills CSV: {e}")
         return ""

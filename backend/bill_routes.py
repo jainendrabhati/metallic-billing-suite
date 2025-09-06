@@ -73,19 +73,19 @@ def create_bill():
     raw_total_fine = weight * ((tunch + wastage) / 100)
     
     # Apply rounding logic
-    if raw_total_fine == 0:
-        total_fine = 0
-    else:
-        integer_part = int(raw_total_fine)
-        decimal_part = raw_total_fine - integer_part
+    # if raw_total_fine == 0:
+    #     total_fine = 0
+    # else:
+    #     integer_part = int(raw_total_fine)
+    #     decimal_part = raw_total_fine - integer_part
         
-        if data['payment_type'] == 'debit':
-            # For debit: if > 0.50, round up, otherwise round down
-            total_fine = integer_part + 1 if decimal_part > 0.50 else integer_part
-        else:
-            # For credit: if > 0.70, round up, otherwise round down  
-            total_fine = integer_part + 1 if decimal_part > 0.70 else integer_part
-    
+    #     if data['payment_type'] == 'debit':
+    #         # For debit: if > 0.50, round up, otherwise round down
+    #         total_fine = integer_part + 1 if decimal_part > 0.50 else integer_part
+    #     else:
+    #         # For credit: if > 0.70, round up, otherwise round down  
+    #         total_fine = integer_part + 1 if decimal_part > 0.70 else integer_part
+    total_fine = raw_total_fine
     if data['payment_type'] == 'debit':
         total_amount = (weight * (wages / 1000)) + silver_amount
     else:
@@ -172,19 +172,19 @@ def update_bill(bill_id):
             raw_total_fine = bill.weight * ((bill.tunch + bill.wastage) / 100)
             
             # Apply rounding logic
-            if raw_total_fine == 0:
-                bill.total_fine = 0
-            else:
-                integer_part = int(raw_total_fine)
-                decimal_part = raw_total_fine - integer_part
+            # if raw_total_fine == 0:
+            #     bill.total_fine = 0
+            # else:
+            #     integer_part = int(raw_total_fine)
+            #     decimal_part = raw_total_fine - integer_part
                 
-                if bill.payment_type == 'debit':
-                    # For debit: if > 0.50, round up, otherwise round down
-                    bill.total_fine = integer_part + 1 if decimal_part > 0.50 else integer_part
-                else:
-                    # For credit: if > 0.70, round up, otherwise round down
-                    bill.total_fine = integer_part + 1 if decimal_part > 0.70 else integer_part
-            
+            #     if bill.payment_type == 'debit':
+            #         # For debit: if > 0.50, round up, otherwise round down
+            #         bill.total_fine = integer_part + 1 if decimal_part > 0.50 else integer_part
+            #     else:
+            #         # For credit: if > 0.70, round up, otherwise round down
+            #         bill.total_fine = integer_part + 1 if decimal_part > 0.70 else integer_part
+            bill.total_fine = raw_total_fine
             if bill.payment_type == 'debit':
                 bill.total_amount = (bill.weight * (bill.wages / 1000)) + bill.silver_amount
             else:

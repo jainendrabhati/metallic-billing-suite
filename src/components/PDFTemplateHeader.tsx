@@ -18,7 +18,7 @@ export const generatePDFHeader = ({ firmSettings, title = "Document" }: PDFTempl
 
 export const generateBankDetailsSection = (firmSettings?: any) => {
   return `
-    <strong>Bank Name:</strong> ${firmSettings?.bank_name || 'STATE BANK OF INDIA'}<br>
+    <strong>Bank Name:</strong> ${firmSettings?.account_holder_name }<br>
     <strong>Branch:</strong> ${firmSettings?.branch_address || 'Benad Road, Jaipur'}<br>
     <strong>A/c No.:</strong> ${firmSettings?.account_number || '61338285502'}<br>
     <strong>IFSC Code:</strong> ${firmSettings?.ifsc_code || 'SBIN0032380'}<br>

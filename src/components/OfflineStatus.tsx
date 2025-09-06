@@ -1,47 +1,45 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Wifi, WifiOff, RefreshCw, Clock } from 'lucide-react';
-import { useOfflineOperations } from '@/hooks/useOfflineOperations';
+import { useHybridAPI } from '@/hooks/useHybridAPI';
+import { Wifi, WifiOff, RefreshCw, Server, ServerOff } from 'lucide-react';
 
 export const OfflineStatus = () => {
-  const { status, forceSync } = useOfflineOperations();
+  const { isLocalServerAvailable, isCheckingServer, forceServerCheck } = useHybridAPI();
+  const isOnline = navigator.onLine;
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      {/* Connection Status */}
-      <Badge variant={status.isOnline ? "default" : "destructive"} className="flex items-center gap-1">
-        {status.isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-        {status.isOnline ? 'Online' : 'Offline'}
+      {/* Internet Status */}
+      <Badge variant={isOnline ? "default" : "secondary"} className="flex items-center gap-1">
+        {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+        {isOnline ? 'Internet' : 'No Internet'}
       </Badge>
 
-      {/* Pending Operations */}
-      {status.pendingOperations > 0 && (
-        <Badge variant="secondary" className="flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          {status.pendingOperations} pending
-        </Badge>
-      )}
+      {/* Local Server Status */}
+      <Badge variant={isLocalServerAvailable ? "default" : "destructive"} className="flex items-center gap-1">
+        {isLocalServerAvailable ? <Server className="h-3 w-3" /> : <ServerOff className="h-3 w-3" />}
+        {isLocalServerAvailable ? 'Server' : 'Server Down'}
+      </Badge>
 
-      {/* Sync Button */}
-      {status.isOnline && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={forceSync}
-          disabled={status.isSyncing}
-          className="h-7 px-2"
-        >
-          <RefreshCw className={`h-3 w-3 ${status.isSyncing ? 'animate-spin' : ''}`} />
-          {status.isSyncing ? 'Syncing...' : 'Sync'}
-        </Button>
-      )}
+      {/* Server Check Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={forceServerCheck}
+        disabled={isCheckingServer}
+        className="h-7 px-2"
+      >
+        <RefreshCw className={`h-3 w-3 ${isCheckingServer ? 'animate-spin' : ''}`} />
+        {isCheckingServer ? 'Checking...' : 'Check Server'}
+      </Button>
 
-      {/* Last Sync Time */}
-      {status.lastSync && (
-        <span className="text-muted-foreground text-xs">
-          Last sync: {status.lastSync.toLocaleTimeString()}
-        </span>
-      )}
+      {/* Status Message */}
+      <span className="text-muted-foreground text-xs">
+        {isLocalServerAvailable 
+          ? '✅ Data synced with local database' 
+          : '⚠️ Using cached data only'
+        }
+      </span>
     </div>
   );
 };

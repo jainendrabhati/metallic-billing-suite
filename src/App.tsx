@@ -13,6 +13,7 @@ import GSTBillPage from "./pages/GSTBillPage";
 import Navbar from "@/components/Navbar";
 import { SidebarProvider } from "@/components/SidebarProvider";
 import LicenseAuthDialog from "@/components/LicenseAuthDialog";
+import { licenseScheduler } from "@/services/licenseScheduler";
 
 import {
   BrowserRouter,
@@ -43,14 +44,48 @@ function AppContent() {
     isLoading,
     showAuthDialog,
     handleAuthSuccess,
+    isServerReady,
+    serverCheckAttempts,
   } = useLicenseAuth();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading application...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="relative mb-8">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary mx-auto"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-8 h-8 bg-primary rounded-full animate-pulse"></div>
+            </div>
+          </div>
+          
+          {!isServerReady ? (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold text-foreground">Starting Application Server</h2>
+              <p className="text-muted-foreground">
+                Please wait while the server starts up...
+              </p>
+              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                <span>Attempt {serverCheckAttempts + 1} of 10</span>
+                <div className="flex space-x-1">
+                  {[...Array(3)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                      style={{ animationDelay: `${i * 0.2}s` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold text-foreground">Checking License</h2>
+              <p className="text-muted-foreground">
+                Verifying your activation key...
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -61,8 +96,8 @@ if (!isAuthenticated) {
       <>
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">License Authentication Required</h1>
-            <p className="text-gray-600">Please authenticate your license to continue.</p>
+            <h1 className="text-2xl font-bold mb-4">Please Wait License is in verification</h1>
+            <p className="text-gray-600">Silvertally Server starting................</p>
           </div>
         </div>
         <LicenseAuthDialog

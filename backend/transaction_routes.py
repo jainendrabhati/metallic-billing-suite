@@ -67,7 +67,6 @@ def export_transactions_csv():
         )
 
     except Exception as e:
-        print(f"Error exporting transactions to CSV: {e}")
         return jsonify({'error': str(e)}), 500
 
 @transaction_bp.route('/transactions/export/pdf', methods=['GET'])
@@ -94,7 +93,6 @@ def export_transactions_pdf():
         )
 
     except Exception as e:
-        print(f"Error exporting transactions to PDF: {e}")
         return jsonify({'error': str(e)}), 500
 
 

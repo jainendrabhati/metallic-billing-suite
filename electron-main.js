@@ -19,8 +19,12 @@ function createWindow() {
   // Hide menu bar for production look
   Menu.setApplicationMenu(null);
 
-  // Load the React app (served by Flask)
-  mainWindow.loadURL('http://localhost:5000');
+  // Load the React app 
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:3000'); // Vite dev server
+  } else {
+    mainWindow.loadURL('http://localhost:5000'); // Production build served by Flask
+  }
   
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -36,11 +40,18 @@ function startFlask() {
   const flaskScript = path.join(__dirname, 'backend', 'run.py');
   flaskProcess = spawn('python', [flaskScript], {
     cwd: path.join(__dirname, 'backend'),
-    stdio: 'inherit'
+    stdio: 'inherit', // Don't inherit stdio to prevent detaching // Ensure process stays attached to parent
   });
   
   flaskProcess.on('error', (err) => {
     console.error('Failed to start Flask:', err);
+  });
+
+  // Ensure Flask process is killed when parent process exits
+  process.on('exit', () => {
+    if (flaskProcess && !flaskProcess.killed) {
+      flaskProcess.kill('SIGTERM');
+    }
   });
 }
 
@@ -54,8 +65,9 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (flaskProcess) {
-    flaskProcess.kill();
+  if (flaskProcess && !flaskProcess.killed) {
+    flaskProcess.kill('SIGTERM');
+    flaskProcess = null;
   }
   app.quit();
 });
@@ -67,7 +79,8 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
-  if (flaskProcess) {
-    flaskProcess.kill();
+  if (flaskProcess && !flaskProcess.killed) {
+    flaskProcess.kill('SIGTERM');
+    flaskProcess = null;
   }
 });

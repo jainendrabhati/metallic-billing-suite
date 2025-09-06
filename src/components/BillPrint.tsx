@@ -134,7 +134,7 @@ const BillPrint: React.FC<BillPrintProps> = ({ bill, firmSettings }) => {
       <th className="text-center">Weight</th>
       <th className="text-center">Tunch</th>
       <th className="text-center">Wastage</th>
-      <th className="text-center">Wages</th>
+      <th className="text-center">Wages (Per KG)</th>
       <th className="text-center">Fine</th>
       <th className="text-center">External Amount</th>
       <th className="text-center">Total Amount</th>

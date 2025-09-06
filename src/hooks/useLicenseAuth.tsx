@@ -1,19 +1,58 @@
 import { useState, useEffect, useCallback } from "react";
 import { licenseAPI } from "@/services/licenseAPI";
 import { useToast } from "@/hooks/use-toast";
-// import { licenseValidationService } from "@/services/licenseValidationService";
+import { hybridAPI } from "@/services/hybridAPI";
+import { licenseScheduler } from "@/services/licenseScheduler";
 
 export const useLicenseAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [isServerReady, setIsServerReady] = useState(false);
+  const [serverCheckAttempts, setServerCheckAttempts] = useState(0);
   const { toast } = useToast();
+
+  const checkServerStatus = useCallback(async () => {
+    const maxAttempts = 20; // Wait up to ~30 seconds (3s * 20 attempts)
+
+    try {
+      const isAvailable = await hybridAPI.checkServerStatus();
+      if (isAvailable) {
+        setIsServerReady(true);
+        return true;
+      } else if (serverCheckAttempts < maxAttempts) {
+        setServerCheckAttempts(prev => prev + 1);
+        // Retry after 30 seconds
+        setTimeout(() => {
+          checkServerStatus();
+        }, 30000);
+        return false;
+      } else {
+        // Server failed to start after max attempts
+        setIsLoading(false);
+        return false;
+      }
+    } catch (error) {
+      console.error("Server check error:", error);
+      if (serverCheckAttempts < maxAttempts) {
+        setServerCheckAttempts(prev => prev + 1);
+        setTimeout(() => {
+          checkServerStatus();
+        }, 3000);
+        return false;
+      } else {
+        setIsLoading(false);
+        return false;
+      }
+    }
+  }, [serverCheckAttempts, toast]);
 
   const checkLicenseStatus = useCallback(async () => {
     try {
       await licenseAPI.getLicense();
       setIsAuthenticated(true);
       setShowAuthDialog(false);
+      await licenseAPI.validateLicense();
     } catch (error: any) {
       console.log("No license found, showing auth dialog");
       setIsAuthenticated(false);
@@ -59,23 +98,31 @@ export const useLicenseAuth = () => {
   }, []);
 
   useEffect(() => {
-    checkLicenseStatus();
-  }, [checkLicenseStatus]);
+    // First check if server is ready, then check license
+    const initializeApp = async () => {
+      const serverReady = await checkServerStatus();
+      if (serverReady) {
+        checkLicenseStatus();
+      }
+    };
+    
+    initializeApp();
+  }, [checkServerStatus, checkLicenseStatus]);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      // Clean up validation service if not authenticated  
-      // licenseValidationService.destroy();
+      // Stop scheduler if not authenticated  
+      licenseScheduler.stop();
       return;
     }
 
-    // The licenseValidationService automatically handles 24-hour validation
-    // No need for manual intervals here as the service manages everything
-    console.log('License validation service is now active');
+    // Start the hourly license validation scheduler
+    licenseScheduler.start();
+    console.log('License scheduler started for hourly validation');
 
     return () => {
-      // Don't destroy the service here as it should persist throughout the app lifecycle
-      // It will be destroyed only when authentication fails
+      // Don't stop the scheduler here as it should persist throughout the app lifecycle
+      // It will be stopped only when authentication fails
     };
   }, [isAuthenticated]);
 
@@ -84,5 +131,7 @@ export const useLicenseAuth = () => {
     isLoading,
     showAuthDialog,
     handleAuthSuccess,
+    isServerReady,
+    serverCheckAttempts,
   };
 };

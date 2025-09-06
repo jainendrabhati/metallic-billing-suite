@@ -47,7 +47,7 @@ const GSTBillPage = () => {
   const [customerAddress, setCustomerAddress] = useState("");
   const [customerGstin, setCustomerGstin] = useState("");
   const [items, setItems] = useState<GSTBillItem[]>([
-    { description: "", hsn: "", weight: 0, rate: 0, amount: 0 }
+    { description: "", hsn: "0", weight: 0, rate: 0, amount: 0 }
   ]);
   const [cgstPercentage, setCgstPercentage] = useState(0);
   const [sgstPercentage, setSgstPercentage] = useState(0);
@@ -121,11 +121,11 @@ const GSTBillPage = () => {
     setDate(new Date());
     setTime(format(new Date(), "HH:mm"));
     setPlace("");
-    setItems([{ description: "", hsn: "", weight: 0, rate: 0, amount: 0 }]);
+    setItems([{ description: "", hsn: "0", weight: 0, rate: 0, amount: 0 }]);
   };
 
   const addItem = () => {
-    setItems([...items, { description: "", hsn: "", weight: 0, rate: 0, amount: 0 }]);
+    setItems([...items, { description: "", hsn: "0", weight: 0, rate: 0, amount: 0 }]);
   };
 
   const removeItem = (index: number) => {
@@ -348,7 +348,7 @@ const GSTBillPage = () => {
     <table style="width: 100%; margin-top: 20px;">
       <tr>
         <td style="width: 50%; vertical-align: top;font-size: 14px;">
-          <strong>Bank Name:</strong> ${firmSettings?.bank_name || 'STATE BANK OF INDIA'}<br>
+          <strong>Bank Name:</strong> ${firmSettings?.account_holder_name }<br>
           <strong>Branch:</strong> ${firmSettings?.branch_address || 'Benad Road, Jaipur'}<br>
           <strong>A/c Name & Number:</strong> ${firmSettings?.account_number || '61338285502'}<br>
           <strong>IFSC Code:</strong> ${firmSettings?.ifsc_code || 'SBIN0032380'}<br><br>
@@ -545,7 +545,7 @@ const GSTBillPage = () => {
     <table style="width: 100%; margin-top: 20px;">
       <tr>
         <td style="width: 50%; vertical-align: top;">
-          <strong>Bank Name:</strong> ${firmSettings?.bank_name || 'STATE BANK OF INDIA'}<br>
+          <strong>Bank Name:</strong> ${firmSettings?.account_holder_name }<br>
           <strong>Branch:</strong> ${firmSettings?.branch_address || 'Benad Road, Jaipur'}<br>
           <strong>A/c No.:</strong> ${firmSettings?.account_number || '61338285502'}<br>
           <strong>IFSC Code:</strong> ${firmSettings?.ifsc_code || 'SBIN0032380'}<br><br>
@@ -598,17 +598,14 @@ const GSTBillPage = () => {
 
   const handlePrintPDF = () => {
     const content = printContent || generatePDFContent();
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(content);
-      printWindow.document.close();
-      printWindow.print();
-      printWindow.close();
-    }
+    
+    
   };
 
   const handleDownloadPDF = () => {
-    handlePrintPDF();
+    const content = printContent || generatePDFContent();
+    
+    
     setIsPDFPreviewOpen(false);
   };
 
@@ -789,7 +786,7 @@ const GSTBillPage = () => {
                                 />
                               </div>
                               <div>
-                                <Label>Rate (₹)</Label>
+                                <Label>Rate Per KG (₹)</Label>
                                 <Input
                                   type="number"
                                   step="0.01"

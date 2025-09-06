@@ -279,7 +279,14 @@ const SettingsPage = () => {
               </CardContent>
             </Card>
 
-            <GoogleDriveSettings />
+            <GoogleDriveSettings 
+              email={googleDriveSettings.email}
+              backupTime={googleDriveSettings.backupTime}
+              autoBackupEnabled={googleDriveSettings.autoBackupEnabled}
+              onEmailChange={(email) => setGoogleDriveSettings(prev => ({ ...prev, email }))}
+              onBackupTimeChange={(time) => setGoogleDriveSettings(prev => ({ ...prev, backupTime: time }))}
+              onAutoBackupChange={(enabled) => setGoogleDriveSettings(prev => ({ ...prev, autoBackupEnabled: enabled }))}
+            />
 
             <Card>
               <CardHeader>

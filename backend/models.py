@@ -1,7 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
 from sqlalchemy import or_, and_
-from google_drive_models import GoogleDriveAuth
 
 db = SQLAlchemy()
 
@@ -904,11 +903,11 @@ class GSTBillItem(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     gst_bill_id = db.Column(db.Integer, db.ForeignKey('gst_bills.id'), nullable=False)
-    description = db.Column(db.String(200), nullable=False)
-    hsn = db.Column(db.String(20), nullable=False)
-    weight = db.Column(db.Float, nullable=False)
-    rate = db.Column(db.Float, nullable=False)
-    amount = db.Column(db.Float, nullable=False)
+    description = db.Column(db.String(200), nullable=True)
+    hsn = db.Column(db.String(20), nullable=True)
+    weight = db.Column(db.Float, nullable=True)
+    rate = db.Column(db.Float, nullable=True)
+    amount = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -928,3 +927,26 @@ class GSTBillItem(db.Model):
         item = cls(**kwargs)
         db.session.add(item)
         return item
+
+class GoogleDriveAuth(db.Model):
+    __tablename__ = 'google_drive_auth'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), nullable=False, unique=True)
+    credentials = db.Column(db.Text, nullable=False)  # Encrypted credentials
+    backup_time = db.Column(db.String(5), default="20:00")  # HH:MM format
+    auto_backup_enabled = db.Column(db.Boolean, default=False)
+    authenticated = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'backup_time': self.backup_time,
+            'auto_backup_enabled': self.auto_backup_enabled,
+            'authenticated': self.authenticated,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

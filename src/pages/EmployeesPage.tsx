@@ -288,9 +288,8 @@ const EmployeesPage = () => {
   };
 
   const handleDeletePayment = (paymentId: number) => {
-    if (window.confirm("Are you sure you want to delete this payment?")) {
-      deleteEmployeePaymentMutation.mutate(paymentId);
-    }
+    deleteEmployeePaymentMutation.mutate(paymentId);
+    
   };
 
   const handleDeleteSalary = (salaryId: number) => {
